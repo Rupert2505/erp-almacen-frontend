@@ -5,6 +5,7 @@ import { MovimientosPage } from '../../features/inventario/pages/MovimientosPage
 import { StockPage } from '../../features/inventario/pages/StockPage'
 import { LoginPage } from '../../features/auth/pages/LoginPage'
 import { ProductosPage } from '../../features/productos/pages/ProductosPage'
+import { ProveedoresPage } from '../../features/proveedores/pages/ProveedoresPage'
 import { ReportesInventarioPage } from '../../features/reportes/pages/ReportesInventarioPage'
 import { UsuariosPage } from '../../features/usuarios/pages/UsuariosPage'
 import { MainLayout } from '../../layout/MainLayout'
@@ -24,6 +25,7 @@ export function AppRouter() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/productos" element={<ProductosPage />} />
+        <Route path="/proveedores" element={<ProveedoresPage />} />
         <Route path="/inventario/movimientos" element={<MovimientosPage />} />
         <Route path="/inventario/stock" element={<StockPage />} />
         <Route path="/inventario/kardex" element={<KardexPage />} />

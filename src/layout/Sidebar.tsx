@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Package,
+  Truck,
   ScrollText,
   ShieldCheck,
   Users,
@@ -24,7 +25,10 @@ const navGroups = [
   },
   {
     label: 'Catalogos',
-    items: [{ label: 'Productos', to: '/productos', icon: Package }],
+    items: [
+      { label: 'Productos', to: '/productos', icon: Package },
+      { label: 'Proveedores', to: '/proveedores', icon: Truck },
+    ],
   },
   {
     label: 'Inventario',
