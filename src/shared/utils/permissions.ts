@@ -7,3 +7,11 @@ export function hasPermission(user: AuthUser | null, permission: string) {
 export function hasRole(user: AuthUser | null, role: string) {
   return Boolean(user?.roles.includes(role))
 }
+
+export function isAdmin(user: AuthUser | null) {
+  return hasRole(user, 'ADMIN')
+}
+
+export function can(user: AuthUser | null, permission: string) {
+  return isAdmin(user) || hasPermission(user, permission)
+}
