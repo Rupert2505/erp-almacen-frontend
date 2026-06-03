@@ -1,4 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { AlmacenesPage } from '../../features/almacenes/pages/AlmacenesPage'
+import { UbicacionesPage } from '../../features/almacenes/pages/UbicacionesPage'
 import { DashboardPage } from '../../features/dashboard/pages/DashboardPage'
 import { KardexPage } from '../../features/inventario/pages/KardexPage'
 import { MovimientosPage } from '../../features/inventario/pages/MovimientosPage'
@@ -26,6 +28,8 @@ export function AppRouter() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/productos" element={<ProductosPage />} />
         <Route path="/proveedores" element={<ProveedoresPage />} />
+        <Route path="/almacenes" element={<AlmacenesPage />} />
+        <Route path="/ubicaciones" element={<UbicacionesPage />} />
         <Route path="/inventario/movimientos" element={<MovimientosPage />} />
         <Route path="/inventario/stock" element={<StockPage />} />
         <Route path="/inventario/kardex" element={<KardexPage />} />

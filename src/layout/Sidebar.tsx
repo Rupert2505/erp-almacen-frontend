@@ -1,9 +1,11 @@
 import {
   BarChart3,
   Boxes,
+  Building2,
   ClipboardList,
   LayoutDashboard,
   Package,
+  MapPinned,
   Truck,
   ScrollText,
   ShieldCheck,
@@ -28,6 +30,8 @@ const navGroups = [
     items: [
       { label: 'Productos', to: '/productos', icon: Package },
       { label: 'Proveedores', to: '/proveedores', icon: Truck },
+      { label: 'Almacenes', to: '/almacenes', icon: Building2 },
+      { label: 'Ubicaciones', to: '/ubicaciones', icon: MapPinned },
     ],
   },
   {
