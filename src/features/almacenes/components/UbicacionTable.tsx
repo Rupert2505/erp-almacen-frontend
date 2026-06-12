@@ -21,10 +21,10 @@ export function UbicacionTable({
   ubicaciones,
 }: UbicacionTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Almacen</th>
               <th className="px-4 py-3">Codigo</th>
@@ -56,7 +56,7 @@ export function UbicacionTable({
                   const isToggleLoading = toggleLoadingId === ubicacion.id
 
                   return (
-                    <tr className="hover:bg-slate-50" key={ubicacion.id}>
+                    <tr className="hover:bg-cyan-50/40" key={ubicacion.id}>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700">
                         {ubicacion.almacenCodigo
                           ? `${ubicacion.almacenCodigo} - ${ubicacion.almacenNombre ?? ''}`
@@ -73,7 +73,7 @@ export function UbicacionTable({
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                             ubicacion.activo
-                              ? 'bg-emerald-50 text-emerald-700'
+                              ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
@@ -84,7 +84,7 @@ export function UbicacionTable({
                         <div className="flex justify-end gap-2">
                           {canManage ? (
                             <button
-                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                               onClick={() => onEdit(ubicacion)}
                               type="button"
                             >

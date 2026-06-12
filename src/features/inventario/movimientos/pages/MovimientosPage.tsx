@@ -61,7 +61,7 @@ function hasAnyInventoryPermission(user: ReturnType<typeof useAuth>['user']) {
   )
 }
 
-function toPayload(values: MovimientoFormValues): MovimientoPayload {
+function toPayload(values: MovimientoFormValues, confirmar = false): MovimientoPayload {
   const tipoMovimiento = values.tipoMovimiento
   const usaOrigen = [
     'SALIDA_CONSUMO',
@@ -76,13 +76,54 @@ function toPayload(values: MovimientoFormValues): MovimientoPayload {
     'AJUSTE_POSITIVO',
     'TRANSFERENCIA',
   ].includes(tipoMovimiento)
+  const esEntradaCompra = tipoMovimiento === 'ENTRADA_COMPRA'
+  const usaProveedor = esEntradaCompra || tipoMovimiento === 'ENTRADA_AJUSTE'
+  const usaDocumentoReferencia = !esEntradaCompra
+  const usaMotivo = [
+    'ENTRADA_AJUSTE',
+    'SALIDA_CONSUMO',
+    'SALIDA_VENTA',
+    'SALIDA_AJUSTE',
+    'TRANSFERENCIA',
+    'AJUSTE_POSITIVO',
+    'AJUSTE_NEGATIVO',
+  ].includes(tipoMovimiento)
+  const usaDatosConsumo = tipoMovimiento === 'SALIDA_CONSUMO'
+  const usaResponsables = tipoMovimiento === 'TRANSFERENCIA'
 
   return {
     tipoMovimiento,
-    proveedorId: tipoMovimiento === 'ENTRADA_COMPRA' ? values.proveedorId : null,
+    fechaMovimiento: new Date().toISOString(),
+    proveedorId: usaProveedor ? values.proveedorId : null,
     almacenOrigenId: usaOrigen ? values.almacenOrigenId : null,
     almacenDestinoId: usaDestino ? values.almacenDestinoId : null,
-    documentoReferencia: values.documentoReferencia?.trim() || null,
+    documentoReferencia: usaDocumentoReferencia ? values.documentoReferencia?.trim() || null : null,
+    motivoMovimiento: usaMotivo ? values.motivoMovimiento?.trim() || null : null,
+    ordenTrabajo: usaDatosConsumo ? values.ordenTrabajo?.trim() || null : null,
+    areaSolicitante: usaDatosConsumo ? values.areaSolicitante?.trim() || null : null,
+    solicitante: usaDatosConsumo ? values.solicitante?.trim() || null : null,
+    responsableEntrega: usaResponsables ? values.responsableEntrega?.trim() || null : null,
+    responsableRecepcion: usaResponsables
+      ? values.responsableRecepcion?.trim() || null
+      : null,
+    guiaSerie: esEntradaCompra ? values.guiaSerie?.trim() || null : null,
+    guiaNumero: esEntradaCompra ? values.guiaNumero?.trim() || null : null,
+    guiaFecha: esEntradaCompra ? values.guiaFecha || null : null,
+    comprobanteTipo:
+      esEntradaCompra ? values.comprobanteTipo || 'FACTURA' : null,
+    comprobanteSerie: esEntradaCompra ? values.comprobanteSerie?.trim() || null : null,
+    comprobanteNumero: esEntradaCompra ? values.comprobanteNumero?.trim() || null : null,
+    comprobanteFechaEmision: esEntradaCompra ? values.comprobanteFechaEmision || null : null,
+    ordenCompra: esEntradaCompra ? values.ordenCompraNumero?.trim() || null : null,
+    ordenCompraNumero: esEntradaCompra ? values.ordenCompraNumero?.trim() || null : null,
+    fechaPedido: esEntradaCompra ? values.fechaPedido || null : null,
+    fechaRecepcion: esEntradaCompra ? values.fechaRecepcion || null : null,
+    flete: esEntradaCompra ? values.flete ?? null : null,
+    movilidad: esEntradaCompra ? values.movilidad ?? null : null,
+    otrosGastos: esEntradaCompra ? values.otrosGastos ?? null : null,
+    observacionDocumentaria:
+      esEntradaCompra ? values.observacionDocumentaria?.trim() || null : null,
+    confirmar,
     observacion: values.observacion?.trim() || null,
     detalles: values.detalles.map((detalle) => ({
       productoId: detalle.productoId,
@@ -141,7 +182,7 @@ export function MovimientosPage() {
       productoService.getProductos({
         activo: true,
         page: 0,
-        size: 300,
+        size: 10,
         texto: '',
       }),
   })
@@ -153,7 +194,7 @@ export function MovimientosPage() {
       proveedorService.getProveedores({
         activo: true,
         page: 0,
-        size: 300,
+        size: 10,
         texto: '',
       }),
   })
@@ -177,14 +218,22 @@ export function MovimientosPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (values: MovimientoFormValues) => movimientoService.createMovimiento(toPayload(values)),
-    onSuccess: async () => {
+    mutationFn: ({
+      confirmar,
+      values,
+    }: {
+      confirmar: boolean
+      values: MovimientoFormValues
+    }) => movimientoService.createMovimiento(toPayload(values, confirmar)),
+    onSuccess: async (_movimiento, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] })
       setIsFormOpen(false)
       setFormError(null)
       setFeedback({
         type: 'success',
-        message: 'Movimiento creado en BORRADOR correctamente.',
+        message: variables.confirmar
+          ? 'Movimiento guardado y confirmado correctamente.'
+          : 'Movimiento guardado en borrador.',
       })
     },
     onError: (error) => {
@@ -426,8 +475,11 @@ export function MovimientosPage() {
             setFormError(null)
           }
         }}
-        onSubmit={async (values) => {
-          await createMutation.mutateAsync(values)
+        onSubmit={async (values, options) => {
+          await createMutation.mutateAsync({
+            confirmar: Boolean(options?.confirmar),
+            values,
+          })
         }}
         productos={productosQuery.data?.content ?? []}
         proveedores={proveedoresQuery.data?.content ?? []}

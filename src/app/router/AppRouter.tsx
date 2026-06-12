@@ -15,6 +15,21 @@ const ProductosPage = lazy(() =>
     default: module.ProductosPage,
   })),
 )
+const FamiliasPage = lazy(() =>
+  import('../../features/familias/pages/FamiliasPage').then((module) => ({
+    default: module.FamiliasPage,
+  })),
+)
+const MarcasPage = lazy(() =>
+  import('../../features/marcas/pages/MarcasPage').then((module) => ({
+    default: module.MarcasPage,
+  })),
+)
+const TiposArticuloPage = lazy(() =>
+  import('../../features/tipos-articulo/pages/TiposArticuloPage').then((module) => ({
+    default: module.TiposArticuloPage,
+  })),
+)
 const ProveedoresPage = lazy(() =>
   import('../../features/proveedores/pages/ProveedoresPage').then((module) => ({
     default: module.ProveedoresPage,
@@ -74,6 +89,10 @@ export function AppRouter() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={lazyRoute(<DashboardPage />)} />
         <Route path="/productos" element={lazyRoute(<ProductosPage />)} />
+        <Route path="/familias" element={lazyRoute(<FamiliasPage />)} />
+        <Route path="/subfamilias" element={<Navigate to="/familias" replace />} />
+        <Route path="/tipos-articulo" element={lazyRoute(<TiposArticuloPage />)} />
+        <Route path="/marcas" element={lazyRoute(<MarcasPage />)} />
         <Route path="/proveedores" element={lazyRoute(<ProveedoresPage />)} />
         <Route path="/almacenes" element={lazyRoute(<AlmacenesPage />)} />
         <Route path="/ubicaciones" element={lazyRoute(<UbicacionesPage />)} />

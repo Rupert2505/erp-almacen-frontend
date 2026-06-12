@@ -30,6 +30,19 @@ function InfoItem({ label, value }: { label: string; value?: string | number | n
   )
 }
 
+const moneyFormatter = new Intl.NumberFormat('es-PE', {
+  currency: 'PEN',
+  style: 'currency',
+})
+
+function formatMoney(value?: number | null) {
+  if (value === null || value === undefined) {
+    return '-'
+  }
+
+  return moneyFormatter.format(value)
+}
+
 export function MovimientoViewModal({
   isLoading,
   isOpen,
@@ -81,6 +94,37 @@ export function MovimientoViewModal({
                 <InfoItem label="Anulado en" value={formatDate(movimiento.anuladoEn)} />
                 <InfoItem label="Creado en" value={formatDate(movimiento.creadoEn)} />
               </div>
+
+              {movimiento.tipoMovimiento === 'ENTRADA_COMPRA' ? (
+                <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <InfoItem label="Serie guia" value={movimiento.guiaSerie} />
+                  <InfoItem label="Numero guia" value={movimiento.guiaNumero} />
+                  <InfoItem label="Fecha guia" value={formatDate(movimiento.guiaFecha)} />
+                  <InfoItem label="Tipo comprobante" value={movimiento.comprobanteTipo} />
+                  <InfoItem label="Serie comprobante" value={movimiento.comprobanteSerie} />
+                  <InfoItem label="Numero comprobante" value={movimiento.comprobanteNumero} />
+                  <InfoItem
+                    label="Fecha emision"
+                    value={formatDate(movimiento.comprobanteFechaEmision)}
+                  />
+                  <InfoItem
+                    label="Orden compra"
+                    value={movimiento.ordenCompraNumero ?? movimiento.ordenCompra}
+                  />
+                  <InfoItem label="Fecha pedido" value={formatDate(movimiento.fechaPedido)} />
+                  <InfoItem
+                    label="Fecha recepcion"
+                    value={formatDate(movimiento.fechaRecepcion)}
+                  />
+                  <InfoItem label="Flete" value={formatMoney(movimiento.flete)} />
+                  <InfoItem label="Movilidad" value={formatMoney(movimiento.movilidad)} />
+                  <InfoItem label="Otros gastos" value={formatMoney(movimiento.otrosGastos)} />
+                  <InfoItem
+                    label="Observacion documentaria"
+                    value={movimiento.observacionDocumentaria}
+                  />
+                </div>
+              ) : null}
 
               {movimiento.observacion ? (
                 <div className="rounded-lg border border-slate-200 p-4">

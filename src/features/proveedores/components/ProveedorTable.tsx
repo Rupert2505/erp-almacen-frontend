@@ -21,14 +21,12 @@ export function ProveedorTable({
   toggleLoadingId,
 }: ProveedorTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="px-4 py-3">Tipo documento</th>
-              <th className="px-4 py-3">Numero documento</th>
-              <th className="px-4 py-3">Razon social</th>
+              <th className="px-4 py-3">Proveedor</th>
               <th className="px-4 py-3">Nombre comercial</th>
               <th className="px-4 py-3">Telefono</th>
               <th className="px-4 py-3">Email</th>
@@ -39,7 +37,7 @@ export function ProveedorTable({
           <tbody className="divide-y divide-slate-100 bg-white">
             {isLoading ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500" colSpan={8}>
+                <td className="px-4 py-8 text-center text-slate-500" colSpan={7}>
                   Cargando proveedores...
                 </td>
               </tr>
@@ -47,7 +45,7 @@ export function ProveedorTable({
 
             {!isLoading && proveedores.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500" colSpan={8}>
+                <td className="px-4 py-8 text-center text-slate-500" colSpan={7}>
                   No se encontraron proveedores.
                 </td>
               </tr>
@@ -58,15 +56,16 @@ export function ProveedorTable({
                   const isToggleLoading = toggleLoadingId === proveedor.id
 
                   return (
-                    <tr className="hover:bg-slate-50" key={proveedor.id}>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
-                        {proveedor.tipoDocumento}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                        {proveedor.numeroDocumento}
-                      </td>
-                      <td className="min-w-64 px-4 py-3 text-slate-900">
-                        {proveedor.razonSocial}
+                    <tr className="hover:bg-cyan-50/40" key={proveedor.id}>
+                      <td className="min-w-72 px-4 py-3">
+                        <div className="space-y-1">
+                          <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                            {proveedor.tipoDocumento} {proveedor.numeroDocumento}
+                          </span>
+                          <p className="font-medium leading-5 text-slate-950">
+                            {proveedor.razonSocial}
+                          </p>
+                        </div>
                       </td>
                       <td className="min-w-48 px-4 py-3 text-slate-600">
                         {proveedor.nombreComercial ?? '-'}
@@ -81,7 +80,7 @@ export function ProveedorTable({
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                             proveedor.activo
-                              ? 'bg-emerald-50 text-emerald-700'
+                              ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
@@ -92,7 +91,7 @@ export function ProveedorTable({
                         <div className="flex justify-end gap-2">
                           {canManage ? (
                             <button
-                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                               onClick={() => onEdit(proveedor)}
                               type="button"
                             >

@@ -18,7 +18,7 @@ export function MovimientoDetalleTable({ detalles }: MovimientoDetalleTableProps
     <div className="overflow-hidden rounded-lg border border-slate-200">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Producto</th>
               <th className="px-4 py-3">Ubicacion origen</th>

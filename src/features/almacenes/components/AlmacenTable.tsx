@@ -23,10 +23,10 @@ export function AlmacenTable({
   toggleLoadingId,
 }: AlmacenTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Codigo</th>
               <th className="px-4 py-3">Nombre</th>
@@ -58,7 +58,7 @@ export function AlmacenTable({
                   const isToggleLoading = toggleLoadingId === almacen.id
 
                   return (
-                    <tr className="hover:bg-slate-50" key={almacen.id}>
+                    <tr className="hover:bg-cyan-50/40" key={almacen.id}>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
                         {almacen.codigo}
                       </td>
@@ -73,7 +73,7 @@ export function AlmacenTable({
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                             almacen.activo
-                              ? 'bg-emerald-50 text-emerald-700'
+                              ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
@@ -83,7 +83,7 @@ export function AlmacenTable({
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex justify-end gap-2">
                           <button
-                            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                             onClick={() => onVerUbicaciones(almacen)}
                             type="button"
                           >
@@ -93,7 +93,7 @@ export function AlmacenTable({
 
                           {canManage ? (
                             <button
-                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                               onClick={() => onEdit(almacen)}
                               type="button"
                             >

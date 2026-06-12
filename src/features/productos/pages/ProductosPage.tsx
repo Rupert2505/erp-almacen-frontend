@@ -11,8 +11,9 @@ import {
 } from '../components/ProductoFilters'
 import { ProductoFormModal } from '../components/ProductoFormModal'
 import { ProductoTable } from '../components/ProductoTable'
-import { categoriaService } from '../services/categoriaService'
-import { marcaService } from '../services/marcaService'
+import { familiaService } from '../../familias/services/familiaService'
+import { marcaService } from '../../marcas/services/marcaService'
+import { tipoArticuloService } from '../../tipos-articulo/services/tipoArticuloService'
 import {
   getApiErrorMessage,
   productoService,
@@ -50,7 +51,9 @@ function toPayload(values: ProductoFormValues): ProductoPayload {
     codigo: values.codigo.trim(),
     nombre: values.nombre.trim(),
     descripcion: values.descripcion?.trim() || null,
-    categoriaId: values.categoriaId ?? null,
+    tipoArticuloId: values.tipoArticuloId,
+    familiaId: values.familiaId,
+    subfamiliaId: values.subfamiliaId ?? null,
     marcaId: values.marcaId ?? null,
     unidadMedidaId: values.unidadMedidaId,
     stockMinimo: values.stockMinimo ?? null,
@@ -68,6 +71,7 @@ export function ProductosPage() {
   const [estado, setEstado] = useState<EstadoProductoFilter>('todos')
   const [page, setPage] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalSession, setModalSession] = useState(0)
   const [editingProducto, setEditingProducto] = useState<Producto | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
@@ -95,16 +99,22 @@ export function ProductosPage() {
     queryFn: () => productoService.getProductos(filters),
   })
 
-  const categoriasQuery = useQuery({
+  const familiasQuery = useQuery({
     enabled: canView,
-    queryKey: ['categorias'],
-    queryFn: categoriaService.getCategorias,
+    queryKey: ['familias-activas'],
+    queryFn: familiaService.getFamiliasActivas,
+  })
+
+  const tiposArticuloQuery = useQuery({
+    enabled: canView,
+    queryKey: ['tipos-articulo-activos'],
+    queryFn: tipoArticuloService.getTiposArticuloActivos,
   })
 
   const marcasQuery = useQuery({
     enabled: canView,
-    queryKey: ['marcas'],
-    queryFn: marcaService.getMarcas,
+    queryKey: ['marcas-activas'],
+    queryFn: marcaService.getMarcasActivas,
   })
 
   const unidadesQuery = useQuery({
@@ -171,7 +181,10 @@ export function ProductosPage() {
   const totalElements = productosQuery.data?.totalElements ?? 0
   const productos = productosQuery.data?.content ?? []
   const isLoadingOptions =
-    categoriasQuery.isLoading || marcasQuery.isLoading || unidadesQuery.isLoading
+    familiasQuery.isLoading ||
+    tiposArticuloQuery.isLoading ||
+    marcasQuery.isLoading ||
+    unidadesQuery.isLoading
 
   const handleTextoChange = (value: string) => {
     setTexto(value)
@@ -186,6 +199,7 @@ export function ProductosPage() {
   const openCreateModal = () => {
     setEditingProducto(null)
     setFormError(null)
+    setModalSession((current) => current + 1)
     setIsModalOpen(true)
   }
 
@@ -197,6 +211,7 @@ export function ProductosPage() {
     try {
       const detalle = await productoService.getProducto(producto.id)
       setEditingProducto(detalle)
+      setModalSession((current) => current + 1)
       setIsModalOpen(true)
     } catch (error) {
       setFeedback({
@@ -338,11 +353,13 @@ export function ProductosPage() {
       </div>
 
       <ProductoFormModal
-        categorias={categoriasQuery.data ?? []}
+        canCreateCatalogs={canCreate}
         errorMessage={formError}
+        familias={familiasQuery.data ?? []}
         isLoadingOptions={isLoadingOptions}
         isOpen={isModalOpen}
         isSaving={saveMutation.isPending}
+        key={modalSession}
         marcas={marcasQuery.data ?? []}
         mode={editingProducto ? 'edit' : 'create'}
         onClose={handleModalClose}
@@ -350,6 +367,7 @@ export function ProductosPage() {
           await saveMutation.mutateAsync(values)
         }}
         producto={editingProducto}
+        tiposArticulo={tiposArticuloQuery.data ?? []}
         unidadesMedida={unidadesQuery.data ?? []}
       />
 

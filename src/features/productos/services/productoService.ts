@@ -75,6 +75,7 @@ export const productoService = {
         size: filters.size,
         texto: filters.texto || undefined,
         activo: filters.activo,
+        tipoArticuloId: filters.tipoArticuloId || undefined,
       },
     })
 

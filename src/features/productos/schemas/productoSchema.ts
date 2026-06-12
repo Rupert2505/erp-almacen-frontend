@@ -30,12 +30,36 @@ const requiredId = z.preprocess(
   z.number('Seleccione una opcion valida').min(1, 'Seleccione una unidad de medida'),
 )
 
+const requiredFamiliaId = z.preprocess(
+  (value) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined
+    }
+
+    return Number(value)
+  },
+  z.number('Seleccione una opcion valida').min(1, 'Seleccione una familia'),
+)
+
+const requiredTipoArticuloId = z.preprocess(
+  (value) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined
+    }
+
+    return Number(value)
+  },
+  z.number('Seleccione una opcion valida').min(1, 'Seleccione un tipo de articulo'),
+)
+
 export const productoSchema = z
   .object({
     codigo: z.string().trim().min(1, 'El codigo es obligatorio'),
     nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
     descripcion: z.string().trim().optional(),
-    categoriaId: optionalId,
+    tipoArticuloId: requiredTipoArticuloId,
+    familiaId: requiredFamiliaId,
+    subfamiliaId: optionalId,
     marcaId: optionalId,
     unidadMedidaId: requiredId,
     stockMinimo: optionalNumber,

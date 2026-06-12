@@ -26,14 +26,14 @@ function formatDate(value?: string | null) {
 
 function estadoClass(estado: Movimiento['estado']) {
   if (estado === 'CONFIRMADO') {
-    return 'bg-emerald-50 text-emerald-700'
+    return 'bg-emerald-100 text-emerald-700'
   }
 
   if (estado === 'ANULADO') {
-    return 'bg-red-50 text-red-700'
+    return 'bg-red-100 text-red-700'
   }
 
-  return 'bg-amber-50 text-amber-700'
+  return 'bg-amber-100 text-amber-700'
 }
 
 export function MovimientoTable({
@@ -47,10 +47,10 @@ export function MovimientoTable({
   puedeConfirmarMovimiento,
 }: MovimientoTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Numero</th>
               <th className="px-4 py-3">Tipo</th>
@@ -85,12 +85,14 @@ export function MovimientoTable({
                   const isProcessing = processingId === movimiento.id
 
                   return (
-                    <tr className="hover:bg-slate-50" key={movimiento.id}>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
-                        {movimiento.numero}
+                    <tr className="hover:bg-cyan-50/40" key={movimiento.id}>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span className="font-semibold text-slate-950">{movimiento.numero}</span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                        {formatMovimientoLabel(movimiento.tipoMovimiento)}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                          {formatMovimientoLabel(movimiento.tipoMovimiento)}
+                        </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span
@@ -108,10 +110,22 @@ export function MovimientoTable({
                         {movimiento.documentoReferencia ?? '-'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                        {movimiento.almacenOrigenCodigo ?? '-'}
+                        {movimiento.almacenOrigenCodigo ? (
+                          <span className="inline-flex rounded bg-slate-50 px-2 py-0.5 font-medium text-slate-700">
+                            {movimiento.almacenOrigenCodigo}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                        {movimiento.almacenDestinoCodigo ?? '-'}
+                        {movimiento.almacenDestinoCodigo ? (
+                          <span className="inline-flex rounded bg-slate-50 px-2 py-0.5 font-medium text-slate-700">
+                            {movimiento.almacenDestinoCodigo}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td className="min-w-52 px-4 py-3 text-slate-600">
                         {movimiento.proveedorRazonSocial ?? '-'}
@@ -119,7 +133,7 @@ export function MovimientoTable({
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex justify-end gap-2">
                           <button
-                            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                             onClick={() => onView(movimiento)}
                             type="button"
                           >

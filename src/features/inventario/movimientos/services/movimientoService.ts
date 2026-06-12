@@ -80,6 +80,7 @@ export const movimientoService = {
         texto: filters.texto || undefined,
         tipoMovimiento: filters.tipoMovimiento || undefined,
         estado: filters.estado || undefined,
+        sort: 'fechaMovimiento,desc',
       },
     })
 

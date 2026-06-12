@@ -21,14 +21,14 @@ function formatDate(value?: string | null) {
 
 function statusClass(status: string) {
   if (status === 'CONFIRMADO') {
-    return 'bg-emerald-50 text-emerald-700'
+    return 'bg-emerald-100 text-emerald-700'
   }
 
   if (status === 'ANULADO') {
-    return 'bg-red-50 text-red-700'
+    return 'bg-red-100 text-red-700'
   }
 
-  return 'bg-amber-50 text-amber-700'
+  return 'bg-amber-100 text-amber-700'
 }
 
 export function ReporteMovimientosTable({ isLoading, rows }: ReporteMovimientosTableProps) {
@@ -36,9 +36,9 @@ export function ReporteMovimientosTable({ isLoading, rows }: ReporteMovimientosT
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="px-4 py-3">Numero</th>
+              <th className="px-4 py-3">Movimiento</th>
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Fecha</th>
@@ -66,12 +66,14 @@ export function ReporteMovimientosTable({ isLoading, rows }: ReporteMovimientosT
               </tr>
             ) : (
               rows.map((row) => (
-                <tr className="hover:bg-slate-50" key={`${row.movimientoId}-${row.productoCodigo}`}>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
-                    {row.numero}
+                <tr className="hover:bg-cyan-50/40" key={`${row.movimientoId}-${row.productoCodigo}`}>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <span className="font-semibold text-slate-950">{row.numero}</span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                    {formatMovimientoLabel(row.tipoMovimiento)}
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                      {formatMovimientoLabel(row.tipoMovimiento)}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span
@@ -88,10 +90,13 @@ export function ReporteMovimientosTable({ isLoading, rows }: ReporteMovimientosT
                   <td className="px-4 py-3 text-slate-600">
                     {row.documentoReferencia || '-'}
                   </td>
-                  <td className="min-w-60 px-4 py-3 text-slate-600">
-                    <span className="font-medium text-slate-800">{row.productoCodigo}</span>
-                    <br />
-                    {row.productoNombre || '-'}
+                  <td className="min-w-72 px-4 py-3">
+                    <div className="space-y-1">
+                      <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        {row.productoCodigo}
+                      </span>
+                      <p className="font-medium leading-5 text-slate-950">{row.productoNombre || '-'}</p>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-600">
                     {row.almacenOrigenNombre || '-'}
@@ -99,13 +104,13 @@ export function ReporteMovimientosTable({ isLoading, rows }: ReporteMovimientosT
                   <td className="px-4 py-3 text-slate-600">
                     {row.almacenDestinoNombre || '-'}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-700">
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
                     {formatNumber(row.cantidad)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-700">
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
                     {formatNumber(row.costoUnitario)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">
                     {formatNumber(row.totalLinea)}
                   </td>
                 </tr>

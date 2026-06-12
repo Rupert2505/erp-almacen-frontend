@@ -36,15 +36,16 @@ export function ProductoTable({
   toggleLoadingId,
 }: ProductoTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="px-4 py-3">Codigo</th>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Categoria</th>
+              <th className="px-4 py-3">Producto</th>
+              <th className="px-4 py-3">Familia</th>
+              <th className="px-4 py-3">Subfamilia</th>
               <th className="px-4 py-3">Marca</th>
+              <th className="px-4 py-3">Tipo de articulo</th>
               <th className="px-4 py-3">Unidad</th>
               <th className="px-4 py-3 text-right">Stock minimo</th>
               <th className="px-4 py-3 text-right">Stock maximo</th>
@@ -56,7 +57,7 @@ export function ProductoTable({
           <tbody className="divide-y divide-slate-100 bg-white">
             {isLoading ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500" colSpan={10}>
+                <td className="px-4 py-8 text-center text-slate-500" colSpan={11}>
                   Cargando productos...
                 </td>
               </tr>
@@ -64,7 +65,7 @@ export function ProductoTable({
 
             {!isLoading && productos.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500" colSpan={10}>
+                <td className="px-4 py-8 text-center text-slate-500" colSpan={11}>
                   No se encontraron productos.
                 </td>
               </tr>
@@ -75,16 +76,26 @@ export function ProductoTable({
                   const isToggleLoading = toggleLoadingId === producto.id
 
                   return (
-                    <tr className="hover:bg-slate-50" key={producto.id}>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
-                        {producto.codigo}
+                    <tr className="hover:bg-cyan-50/40" key={producto.id}>
+                      <td className="min-w-72 px-4 py-3">
+                        <div className="space-y-1">
+                          <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                            {producto.codigo}
+                          </span>
+                          <p className="font-medium leading-5 text-slate-950">{producto.nombre}</p>
+                        </div>
                       </td>
-                      <td className="min-w-56 px-4 py-3 text-slate-900">{producto.nombre}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                        {producto.categoriaNombre ?? '-'}
+                        {producto.familiaNombre ?? '-'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                        {producto.subfamiliaNombre ?? '-'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                         {producto.marcaNombre ?? '-'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                        {producto.tipoArticuloNombre ?? producto.tipoArticuloCodigo ?? '-'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                         {producto.unidadMedidaAbreviatura ?? producto.unidadMedidaNombre ?? '-'}
@@ -102,7 +113,7 @@ export function ProductoTable({
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                             producto.activo
-                              ? 'bg-emerald-50 text-emerald-700'
+                              ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
@@ -113,7 +124,7 @@ export function ProductoTable({
                         <div className="flex justify-end gap-2">
                           {canEdit ? (
                             <button
-                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                               onClick={() => onEdit(producto)}
                               type="button"
                             >

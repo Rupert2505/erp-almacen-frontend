@@ -49,6 +49,27 @@ export type Movimiento = {
   almacenDestinoCodigo?: string | null
   almacenDestinoNombre?: string | null
   documentoReferencia?: string | null
+  motivoMovimiento?: string | null
+  ordenTrabajo?: string | null
+  areaSolicitante?: string | null
+  solicitante?: string | null
+  responsableEntrega?: string | null
+  responsableRecepcion?: string | null
+  guiaSerie?: string | null
+  guiaNumero?: string | null
+  guiaFecha?: string | null
+  comprobanteTipo?: 'FACTURA' | 'BOLETA' | 'OTRO' | null
+  comprobanteSerie?: string | null
+  comprobanteNumero?: string | null
+  comprobanteFechaEmision?: string | null
+  ordenCompra?: string | null
+  ordenCompraNumero?: string | null
+  fechaPedido?: string | null
+  fechaRecepcion?: string | null
+  flete?: number | null
+  movilidad?: number | null
+  otrosGastos?: number | null
+  observacionDocumentaria?: string | null
   observacion?: string | null
   usuarioId?: number | null
   username?: string | null
@@ -70,10 +91,33 @@ export type MovimientoDetallePayload = {
 
 export type MovimientoPayload = {
   tipoMovimiento: TipoMovimiento
+  fechaMovimiento?: string | null
   proveedorId?: number | null
   almacenOrigenId?: number | null
   almacenDestinoId?: number | null
   documentoReferencia?: string | null
+  motivoMovimiento?: string | null
+  ordenTrabajo?: string | null
+  areaSolicitante?: string | null
+  solicitante?: string | null
+  responsableEntrega?: string | null
+  responsableRecepcion?: string | null
+  guiaSerie?: string | null
+  guiaNumero?: string | null
+  guiaFecha?: string | null
+  comprobanteTipo?: 'FACTURA' | 'BOLETA' | 'OTRO' | null
+  comprobanteSerie?: string | null
+  comprobanteNumero?: string | null
+  comprobanteFechaEmision?: string | null
+  ordenCompra?: string | null
+  ordenCompraNumero?: string | null
+  fechaPedido?: string | null
+  fechaRecepcion?: string | null
+  flete?: number | null
+  movilidad?: number | null
+  otrosGastos?: number | null
+  observacionDocumentaria?: string | null
+  confirmar?: boolean
   observacion?: string | null
   detalles: MovimientoDetallePayload[]
 }

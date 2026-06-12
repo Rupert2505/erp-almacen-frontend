@@ -3,14 +3,16 @@ export type Producto = {
   codigo: string
   nombre: string
   descripcion?: string | null
-  categoriaId?: number | null
-  categoriaCodigo?: string | null
-  categoriaNombre?: string | null
+  tipoArticuloId: number
+  tipoArticuloCodigo?: string | null
+  tipoArticuloNombre?: string | null
+  familiaId: number
+  familiaNombre?: string | null
+  subfamiliaId?: number | null
+  subfamiliaNombre?: string | null
   marcaId?: number | null
-  marcaCodigo?: string | null
   marcaNombre?: string | null
   unidadMedidaId: number
-  unidadMedidaCodigo?: string | null
   unidadMedidaNombre?: string | null
   unidadMedidaAbreviatura?: string | null
   stockMinimo?: number | null
@@ -27,7 +29,9 @@ export type ProductoPayload = {
   codigo: string
   nombre: string
   descripcion?: string | null
-  categoriaId?: number | null
+  tipoArticuloId: number
+  familiaId: number
+  subfamiliaId?: number | null
   marcaId?: number | null
   unidadMedidaId: number
   stockMinimo?: number | null
@@ -40,6 +44,7 @@ export type ProductoPayload = {
 export type ProductoFilters = {
   texto?: string
   activo?: boolean
+  tipoArticuloId?: number | null
   page: number
   size: number
 }

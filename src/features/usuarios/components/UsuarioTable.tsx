@@ -38,10 +38,10 @@ export function UsuarioTable({
   usuarios,
 }: UsuarioTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Username</th>
               <th className="px-4 py-3">Nombres</th>
@@ -74,7 +74,7 @@ export function UsuarioTable({
                   const isActionLoading = actionLoadingId === usuario.id
 
                   return (
-                    <tr className="hover:bg-slate-50" key={usuario.id}>
+                    <tr className="hover:bg-cyan-50/40" key={usuario.id}>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
                         {usuario.username}
                       </td>
@@ -88,7 +88,7 @@ export function UsuarioTable({
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                             usuario.activo
-                              ? 'bg-emerald-50 text-emerald-700'
+                              ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
@@ -98,7 +98,7 @@ export function UsuarioTable({
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex justify-end gap-2">
                           <button
-                            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                             onClick={() => onView(usuario)}
                             type="button"
                           >
@@ -109,7 +109,7 @@ export function UsuarioTable({
                           {canManage ? (
                             <>
                               <button
-                                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                                 disabled={isActionLoading}
                                 onClick={() => onEdit(usuario)}
                                 type="button"
@@ -118,7 +118,7 @@ export function UsuarioTable({
                                 Editar
                               </button>
                               <button
-                                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                                 disabled={isActionLoading}
                                 onClick={() => onCambiarRoles(usuario)}
                                 type="button"
@@ -127,7 +127,7 @@ export function UsuarioTable({
                                 Roles
                               </button>
                               <button
-                                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
                                 disabled={isActionLoading}
                                 onClick={() => onResetPassword(usuario)}
                                 type="button"

@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { TIPOS_MOVIMIENTO } from '../types/movimiento.types'
 
+const TIPOS_COMPROBANTE = ['FACTURA', 'BOLETA', 'OTRO'] as const
+
 const requiredId = (message: string) =>
   z.preprocess(
     (value) => {
@@ -56,11 +58,45 @@ export const movimientoSchema = z
     almacenOrigenId: optionalId,
     almacenDestinoId: optionalId,
     documentoReferencia: z.string().trim().optional(),
+    motivoMovimiento: z.string().trim().optional(),
+    ordenTrabajo: z.string().trim().optional(),
+    areaSolicitante: z.string().trim().optional(),
+    solicitante: z.string().trim().optional(),
+    responsableEntrega: z.string().trim().optional(),
+    responsableRecepcion: z.string().trim().optional(),
+    guiaSerie: z.string().trim().optional(),
+    guiaNumero: z.string().trim().optional(),
+    guiaFecha: z.string().trim().optional(),
+    comprobanteTipo: z.enum(TIPOS_COMPROBANTE).optional(),
+    comprobanteSerie: z.string().trim().optional(),
+    comprobanteNumero: z.string().trim().optional(),
+    comprobanteFechaEmision: z.string().trim().optional(),
+    ordenCompraNumero: z.string().trim().optional(),
+    fechaPedido: z.string().trim().optional(),
+    fechaRecepcion: z.string().trim().optional(),
+    flete: optionalNumber,
+    movilidad: optionalNumber,
+    otrosGastos: optionalNumber,
+    observacionDocumentaria: z.string().trim().optional(),
     observacion: z.string().trim().optional(),
     detalles: z.array(movimientoDetalleSchema).min(1, 'Agregue al menos un detalle'),
   })
   .superRefine((values, context) => {
     const requireProveedor = values.tipoMovimiento === 'ENTRADA_COMPRA'
+    const requireMotivo = [
+      'ENTRADA_AJUSTE',
+      'SALIDA_CONSUMO',
+      'SALIDA_AJUSTE',
+      'AJUSTE_POSITIVO',
+      'AJUSTE_NEGATIVO',
+    ].includes(values.tipoMovimiento)
+    const requireObservacion = [
+      'ENTRADA_AJUSTE',
+      'SALIDA_CONSUMO',
+      'SALIDA_AJUSTE',
+      'AJUSTE_POSITIVO',
+      'AJUSTE_NEGATIVO',
+    ].includes(values.tipoMovimiento)
     const requireDestino = [
       'ENTRADA_COMPRA',
       'ENTRADA_AJUSTE',
@@ -80,6 +116,22 @@ export const movimientoSchema = z
         code: 'custom',
         message: 'Seleccione un proveedor',
         path: ['proveedorId'],
+      })
+    }
+
+    if (requireMotivo && !values.motivoMovimiento?.trim()) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Ingrese el motivo del movimiento',
+        path: ['motivoMovimiento'],
+      })
+    }
+
+    if (requireObservacion && !values.observacion?.trim()) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Ingrese la observacion',
+        path: ['observacion'],
       })
     }
 
@@ -111,6 +163,70 @@ export const movimientoSchema = z
         path: ['almacenDestinoId'],
       })
     }
+
+    if (
+      values.fechaPedido &&
+      values.fechaRecepcion &&
+      new Date(values.fechaRecepcion) < new Date(values.fechaPedido)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'La fecha de recepcion no puede ser menor que la fecha de pedido',
+        path: ['fechaRecepcion'],
+      })
+    }
+
+    if (values.tipoMovimiento === 'ENTRADA_COMPRA' && !values.fechaRecepcion) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Ingrese la fecha de recepcion',
+        path: ['fechaRecepcion'],
+      })
+    }
+
+    if (values.guiaSerie && !values.guiaNumero) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Ingrese el numero de guia',
+        path: ['guiaNumero'],
+      })
+    }
+
+    if (!values.guiaSerie && values.guiaNumero) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Ingrese la serie de guia',
+        path: ['guiaSerie'],
+      })
+    }
+
+    if (values.comprobanteSerie && !values.comprobanteNumero) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Ingrese el numero de comprobante',
+        path: ['comprobanteNumero'],
+      })
+    }
+
+    if (!values.comprobanteSerie && values.comprobanteNumero) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Ingrese la serie de comprobante',
+        path: ['comprobanteSerie'],
+      })
+    }
+
+    if (values.tipoMovimiento === 'ENTRADA_COMPRA') {
+      values.detalles.forEach((detalle, index) => {
+        if (detalle.costoUnitario === undefined || detalle.costoUnitario === null) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Ingrese el costo unitario',
+            path: ['detalles', index, 'costoUnitario'],
+          })
+        }
+      })
+    }
   })
 
 export const anularMovimientoSchema = z.object({
@@ -120,3 +236,4 @@ export const anularMovimientoSchema = z.object({
 export type MovimientoFormInput = z.input<typeof movimientoSchema>
 export type MovimientoFormValues = z.infer<typeof movimientoSchema>
 export type AnularMovimientoValues = z.infer<typeof anularMovimientoSchema>
+export type ComprobanteTipo = (typeof TIPOS_COMPROBANTE)[number]

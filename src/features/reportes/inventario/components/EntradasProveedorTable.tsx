@@ -23,11 +23,10 @@ export function EntradasProveedorTable({ isLoading, rows }: EntradasProveedorTab
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="px-4 py-3">Proveedor documento</th>
-              <th className="px-4 py-3">Proveedor razon social</th>
-              <th className="px-4 py-3">Numero movimiento</th>
+              <th className="px-4 py-3">Proveedor</th>
+              <th className="px-4 py-3">Movimiento</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Documento referencia</th>
               <th className="px-4 py-3">Producto</th>
@@ -39,27 +38,31 @@ export function EntradasProveedorTable({ isLoading, rows }: EntradasProveedorTab
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td className="px-4 py-6 text-center text-slate-500" colSpan={9}>
+                <td className="px-4 py-6 text-center text-slate-500" colSpan={8}>
                   Consultando entradas por proveedor...
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-slate-500" colSpan={9}>
+                <td className="px-4 py-6 text-center text-slate-500" colSpan={8}>
                   No hay entradas por proveedor para los filtros seleccionados.
                 </td>
               </tr>
             ) : (
               rows.map((row) => (
-                <tr className="hover:bg-slate-50" key={`${row.movimientoId}-${row.productoCodigo}`}>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
-                    {row.proveedorDocumento || '-'}
+                <tr className="hover:bg-cyan-50/40" key={`${row.movimientoId}-${row.productoCodigo}`}>
+                  <td className="min-w-72 px-4 py-3">
+                    <div className="space-y-1">
+                      <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        {row.proveedorDocumento || 'Sin documento'}
+                      </span>
+                      <p className="font-medium leading-5 text-slate-950">
+                        {row.proveedorRazonSocial || '-'}
+                      </p>
+                    </div>
                   </td>
-                  <td className="min-w-64 px-4 py-3 text-slate-600">
-                    {row.proveedorRazonSocial || '-'}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                    {row.numeroMovimiento}
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <span className="font-semibold text-slate-950">{row.numeroMovimiento}</span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                     {formatDate(row.fechaMovimiento)}
@@ -67,18 +70,21 @@ export function EntradasProveedorTable({ isLoading, rows }: EntradasProveedorTab
                   <td className="px-4 py-3 text-slate-600">
                     {row.documentoReferencia || '-'}
                   </td>
-                  <td className="min-w-60 px-4 py-3 text-slate-600">
-                    <span className="font-medium text-slate-800">{row.productoCodigo}</span>
-                    <br />
-                    {row.productoNombre || '-'}
+                  <td className="min-w-72 px-4 py-3">
+                    <div className="space-y-1">
+                      <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        {row.productoCodigo}
+                      </span>
+                      <p className="font-medium leading-5 text-slate-950">{row.productoNombre || '-'}</p>
+                    </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-700">
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
                     {formatNumber(row.cantidad)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-slate-700">
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
                     {formatNumber(row.costoUnitario)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">
                     {formatNumber(row.totalLinea)}
                   </td>
                 </tr>

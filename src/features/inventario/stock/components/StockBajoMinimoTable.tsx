@@ -11,10 +11,10 @@ const numberFormatter = new Intl.NumberFormat('es-PE', {
 
 export function StockBajoMinimoTable({ isLoading, rows }: StockBajoMinimoTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="sticky top-0 z-10 bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Producto</th>
               <th className="px-4 py-3">Almacen</th>
@@ -42,29 +42,49 @@ export function StockBajoMinimoTable({ isLoading, rows }: StockBajoMinimoTablePr
             ) : null}
             {!isLoading
               ? rows.map((row) => (
-                  <tr className="hover:bg-amber-50/40" key={`${row.productoId}-${row.almacenId}-${row.ubicacionId ?? 'sin'}`}>
-                    <td className="min-w-64 px-4 py-3 text-slate-900">
-                      <span className="font-medium">{row.productoCodigo}</span> - {row.productoNombre}
+                  <tr
+                    className="hover:bg-amber-50/50"
+                    key={`${row.productoId}-${row.almacenId}-${row.ubicacionId ?? 'sin'}`}
+                  >
+                    <td className="min-w-72 px-4 py-3">
+                      <div className="space-y-1">
+                        <span className="inline-flex rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                          {row.productoCodigo}
+                        </span>
+                        <p className="font-medium leading-5 text-slate-950">{row.productoNombre}</p>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {row.almacenCodigo} - {row.almacenNombre}
+                    <td className="min-w-72 px-4 py-3">
+                      <div className="space-y-1">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {row.almacenCodigo}
+                        </span>
+                        <p className="leading-5 text-slate-700">{row.almacenNombre}</p>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {row.ubicacionCodigo
-                        ? `${row.ubicacionCodigo} - ${row.ubicacionNombre ?? ''}`
-                        : '-'}
+                    <td className="min-w-64 px-4 py-3">
+                      {row.ubicacionCodigo ? (
+                        <div className="space-y-1">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            {row.ubicacionCodigo}
+                          </span>
+                          <p className="leading-5 text-slate-700">{row.ubicacionNombre ?? '-'}</p>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">Sin ubicacion</span>
+                      )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-slate-700">
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
                       {numberFormatter.format(row.cantidadActual)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-slate-700">
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
                       {numberFormatter.format(row.stockMinimo)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-amber-700">
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-amber-700">
                       {numberFormatter.format(row.diferencia)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                    <td className="whitespace-nowrap px-4 py-3 text-center">
+                      <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
                         Bajo minimo
                       </span>
                     </td>
