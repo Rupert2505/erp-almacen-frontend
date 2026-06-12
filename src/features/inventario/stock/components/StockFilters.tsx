@@ -35,7 +35,7 @@ export function StockFilters({
   ubicacionId,
 }: StockFiltersProps) {
   const ubicacionesFiltradas = almacenId
-    ? ubicaciones.filter((ubicacion) => ubicacion.almacenId === almacenId)
+    ? ubicaciones.filter((ubicacion) => Number(ubicacion.almacenId) === almacenId)
     : ubicaciones
 
   return (

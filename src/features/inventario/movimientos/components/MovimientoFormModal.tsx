@@ -9,6 +9,8 @@ import { productoService } from '../../../productos/services/productoService'
 import type { Producto } from '../../../productos/types/producto.types'
 import { proveedorService } from '../../../proveedores/services/proveedorService'
 import type { Proveedor } from '../../../proveedores/types/proveedor.types'
+import { stockService } from '../../stock/services/stockService'
+import type { StockItem } from '../../stock/types/stock.types'
 import {
   movimientoSchema,
   type MovimientoFormInput,
@@ -29,6 +31,13 @@ type MovimientoFormModalProps = {
   onSubmit: (values: MovimientoFormValues, options?: { confirmar: boolean }) => Promise<void>
 }
 
+type StockLineaState = {
+  cantidadDisponible?: number
+  message: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  ubicacionId?: number | null
+}
+
 const inputClass =
   'h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-100 disabled:text-slate-500'
 
@@ -37,7 +46,19 @@ const textareaClass =
 
 const labelClass = 'mb-2 block text-sm font-medium text-slate-700'
 
-const defaultValues: MovimientoFormInput = {
+function createDetalleInicial() {
+  return {
+    productoId: 0,
+    ubicacionOrigenId: null,
+    ubicacionDestinoId: null,
+    cantidad: 1,
+    costoUnitario: undefined,
+    observacion: '',
+  }
+}
+
+function createDefaultValues(): MovimientoFormInput {
+  return {
   tipoMovimiento: 'ENTRADA_COMPRA',
   proveedorId: null,
   almacenOrigenId: null,
@@ -52,7 +73,7 @@ const defaultValues: MovimientoFormInput = {
   guiaSerie: '',
   guiaNumero: '',
   guiaFecha: '',
-  comprobanteTipo: 'FACTURA',
+  comprobanteTipo: '',
   comprobanteSerie: '',
   comprobanteNumero: '',
   comprobanteFechaEmision: '',
@@ -64,16 +85,8 @@ const defaultValues: MovimientoFormInput = {
   otrosGastos: undefined,
   observacionDocumentaria: '',
   observacion: '',
-  detalles: [
-    {
-      productoId: 0,
-      ubicacionOrigenId: null,
-      ubicacionDestinoId: null,
-      cantidad: 1,
-      costoUnitario: undefined,
-      observacion: '',
-    },
-  ],
+  detalles: [createDetalleInicial()],
+  }
 }
 
 function requiereProveedor(tipoMovimiento?: TipoMovimiento) {
@@ -130,6 +143,8 @@ function movimientoRules(tipoMovimiento: TipoMovimiento) {
     showProveedor: isEntradaCompra || isEntradaAjuste,
     showResponsables: isTransferencia,
     showSolicitante: isSalidaConsumo,
+    useCostoAutomatico:
+      isSalidaConsumo || isSalidaVenta || isSalidaAjuste || isTransferencia || isAjusteNegativo,
   }
 }
 
@@ -154,6 +169,9 @@ export function MovimientoFormModal({
   ubicaciones,
 }: MovimientoFormModalProps) {
   const [pendingConfirmValues, setPendingConfirmValues] = useState<MovimientoFormValues | null>(null)
+  const [stockLineaState, setStockLineaState] = useState<Record<number, StockLineaState>>({})
+  const [stockConfirmError, setStockConfirmError] = useState<string | null>(null)
+  const previousAlmacenOrigen = useRef<number | null>(null)
   const previousTipoMovimiento = useRef<TipoMovimiento | null>(null)
   const {
     control,
@@ -164,9 +182,9 @@ export function MovimientoFormModal({
     setValue,
   } = useForm<MovimientoFormInput, unknown, MovimientoFormValues>({
     resolver: zodResolver(movimientoSchema),
-    defaultValues,
+    defaultValues: createDefaultValues(),
   })
-  const { append, fields, remove } = useFieldArray({
+  const { append, fields, remove, replace } = useFieldArray({
     control,
     name: 'detalles',
   })
@@ -177,17 +195,20 @@ export function MovimientoFormModal({
   const detalles = useWatch({ control, name: 'detalles' })
   const almacenOrigenId = Number(almacenOrigenValue || 0)
   const almacenDestinoId = Number(almacenDestinoValue || 0)
+  const detalleCostoKey = detalles
+    .map((detalle) => `${detalle.productoId || 0}:${detalle.ubicacionOrigenId || 0}`)
+    .join('|')
   const mostrarOrigen = requiereOrigen(tipoMovimiento)
   const mostrarDestino = requiereDestino(tipoMovimiento)
   const rules = movimientoRules(tipoMovimiento)
   const mostrarProveedor = rules.showProveedor
   const mostrarEntradaCompra = rules.showDocumentosCompra
   const ubicacionesOrigen = useMemo(
-    () => ubicaciones.filter((ubicacion) => ubicacion.almacenId === almacenOrigenId),
+    () => ubicaciones.filter((ubicacion) => Number(ubicacion.almacenId) === almacenOrigenId),
     [almacenOrigenId, ubicaciones],
   )
   const ubicacionesDestino = useMemo(
-    () => ubicaciones.filter((ubicacion) => ubicacion.almacenId === almacenDestinoId),
+    () => ubicaciones.filter((ubicacion) => Number(ubicacion.almacenId) === almacenDestinoId),
     [almacenDestinoId, ubicaciones],
   )
   const totals = useMemo(() => {
@@ -220,7 +241,6 @@ export function MovimientoFormModal({
       })),
     [proveedores],
   )
-
   const buscarProductos = useCallback(async (texto: string) => {
     const response = await productoService.getProductos({
       activo: true,
@@ -271,16 +291,154 @@ export function MovimientoFormModal({
     [buscarProductos, productoOptions],
   )
 
+  const seleccionarStockDisponible = useCallback(
+    (stockItems: StockItem[], ubicacionOrigenId?: number | null) => {
+      if (ubicacionOrigenId) {
+        return stockItems.find(
+          (item) => item.ubicacionId === ubicacionOrigenId && Number(item.cantidadActual || 0) > 0,
+        )
+      }
+
+      return stockItems.find((item) => Number(item.cantidadActual || 0) > 0)
+    },
+    [],
+  )
+
+  const resolverCostoActual = useCallback(
+    async (index: number, productoId: number, ubicacionOrigenId?: number | null) => {
+      if (!rules.useCostoAutomatico || !productoId) {
+        return
+      }
+
+      setValue(`detalles.${index}.costoUnitario`, undefined, {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      setStockConfirmError(null)
+
+      if (!almacenOrigenId) {
+        setStockLineaState((current) => ({
+          ...current,
+          [index]: {
+            message: 'Seleccione el almacen origen en Datos generales para cargar el costo actual.',
+            type: 'info',
+          },
+        }))
+        return
+      }
+
+      setStockLineaState((current) => ({
+        ...current,
+        [index]: {
+          message: 'Buscando costo actual...',
+          type: 'info',
+        },
+      }))
+
+      try {
+        const stockPage = await stockService.getStock({
+          almacenId: almacenOrigenId,
+          page: 0,
+          productoId,
+          size: 50,
+          ubicacionId: ubicacionOrigenId || undefined,
+        })
+        const stockDisponible = seleccionarStockDisponible(stockPage.content, ubicacionOrigenId)
+
+        if (!stockDisponible) {
+          const tieneStockEnCero = stockPage.content.some(
+            (item) => Number(item.cantidadActual || 0) <= 0,
+          )
+
+          setStockLineaState((current) => ({
+            ...current,
+            [index]: {
+              message: tieneStockEnCero
+                ? 'Producto sin stock en el almacen seleccionado.'
+                : 'No hay stock disponible para este producto en el almacen seleccionado.',
+              type: 'warning',
+            },
+          }))
+          return
+        }
+
+        if (stockDisponible.costoPromedio === undefined || stockDisponible.costoPromedio === null) {
+          if (stockDisponible.ubicacionId && !ubicacionOrigenId) {
+            setValue(`detalles.${index}.ubicacionOrigenId`, stockDisponible.ubicacionId, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }
+
+          setStockLineaState((current) => ({
+            ...current,
+            [index]: {
+              cantidadDisponible: stockDisponible.cantidadActual,
+              message: 'Stock disponible sin costo promedio registrado.',
+              type: 'warning',
+              ubicacionId: stockDisponible.ubicacionId,
+            },
+          }))
+          return
+        }
+
+        if (stockDisponible.ubicacionId && !ubicacionOrigenId) {
+          setValue(`detalles.${index}.ubicacionOrigenId`, stockDisponible.ubicacionId, {
+            shouldDirty: true,
+            shouldValidate: true,
+          })
+        }
+
+        setValue(`detalles.${index}.costoUnitario`, stockDisponible.costoPromedio, {
+          shouldDirty: true,
+          shouldValidate: true,
+        })
+        setStockLineaState((current) => ({
+          ...current,
+          [index]: {
+            cantidadDisponible: stockDisponible.cantidadActual,
+            message: `Stock disponible: ${stockDisponible.cantidadActual}`,
+            type: 'success',
+            ubicacionId: stockDisponible.ubicacionId,
+          },
+        }))
+      } catch {
+        setStockLineaState((current) => ({
+          ...current,
+          [index]: {
+            message: 'No se pudo consultar el stock actual para este producto.',
+            type: 'error',
+          },
+        }))
+      }
+    },
+    [almacenOrigenId, rules.useCostoAutomatico, seleccionarStockDisponible, setValue],
+  )
+
+  const resetFormulario = useCallback(() => {
+    const nextValues = createDefaultValues()
+    previousTipoMovimiento.current = null
+    previousAlmacenOrigen.current = null
+    reset(nextValues)
+    replace(nextValues.detalles)
+  }, [replace, reset])
+
   useEffect(() => {
-    if (isOpen) {
-      previousTipoMovimiento.current = null
-      reset(defaultValues)
-    }
-  }, [isOpen, reset])
+    resetFormulario()
+
+    const timeoutId = window.setTimeout(() => {
+      setPendingConfirmValues(null)
+      setStockLineaState({})
+      setStockConfirmError(null)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isOpen, resetFormulario])
 
   useEffect(() => {
     if (!isOpen) {
       previousTipoMovimiento.current = null
+      previousAlmacenOrigen.current = null
       return
     }
 
@@ -348,7 +506,7 @@ export function MovimientoFormModal({
       setValue('guiaSerie', '', { shouldDirty: true, shouldValidate: true })
       setValue('guiaNumero', '', { shouldDirty: true, shouldValidate: true })
       setValue('guiaFecha', '', { shouldDirty: true, shouldValidate: true })
-      setValue('comprobanteTipo', 'FACTURA', { shouldDirty: true, shouldValidate: true })
+      setValue('comprobanteTipo', '', { shouldDirty: true, shouldValidate: true })
       setValue('comprobanteSerie', '', { shouldDirty: true, shouldValidate: true })
       setValue('comprobanteNumero', '', { shouldDirty: true, shouldValidate: true })
       setValue('comprobanteFechaEmision', '', { shouldDirty: true, shouldValidate: true })
@@ -361,8 +519,66 @@ export function MovimientoFormModal({
       setValue('observacionDocumentaria', '', { shouldDirty: true, shouldValidate: true })
     }
 
+    if (nextRules.useCostoAutomatico) {
+      fields.forEach((_, index) => {
+        setValue(`detalles.${index}.costoUnitario`, undefined, {
+          shouldDirty: true,
+          shouldValidate: true,
+        })
+      })
+    }
+
     previousTipoMovimiento.current = tipoMovimiento
   }, [fields, isOpen, mostrarDestino, mostrarOrigen, setValue, tipoMovimiento])
+
+  useEffect(() => {
+    if (!isOpen || !rules.useCostoAutomatico) {
+      previousAlmacenOrigen.current = almacenOrigenId || null
+      return
+    }
+
+    if (previousAlmacenOrigen.current === null) {
+      previousAlmacenOrigen.current = almacenOrigenId || null
+      return
+    }
+
+    if (previousAlmacenOrigen.current === almacenOrigenId) {
+      return
+    }
+
+    fields.forEach((_, index) => {
+      setValue(`detalles.${index}.ubicacionOrigenId`, null, {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      setValue(`detalles.${index}.costoUnitario`, undefined, {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+    })
+
+    previousAlmacenOrigen.current = almacenOrigenId || null
+  }, [almacenOrigenId, fields, isOpen, rules.useCostoAutomatico, setValue])
+
+  useEffect(() => {
+    if (!isOpen || !rules.useCostoAutomatico) {
+      return
+    }
+
+    detalleCostoKey.split('|').forEach((value, index) => {
+      const [productoIdValue, ubicacionOrigenIdValue] = value.split(':')
+      const productoId = Number(productoIdValue || 0)
+      const ubicacionOrigenIdValueNumber = Number(ubicacionOrigenIdValue || 0)
+
+      if (productoId) {
+        void resolverCostoActual(
+          index,
+          productoId,
+          ubicacionOrigenIdValueNumber || null,
+        )
+      }
+    })
+  }, [detalleCostoKey, isOpen, resolverCostoActual, rules.useCostoAutomatico])
 
   if (!isOpen) {
     return null
@@ -518,7 +734,7 @@ export function MovimientoFormModal({
             <section className="mt-6 rounded-lg border border-slate-200 border-l-blue-500 border-l-4 p-4">
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-slate-950">
-                  Datos de consumo / ajuste / transferencia
+                  Datos complementarios
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Complete la informacion operativa requerida para el tipo seleccionado.
@@ -605,7 +821,7 @@ export function MovimientoFormModal({
                   <p className="mb-3 text-sm font-semibold text-slate-700">Guia de remision</p>
                   <div className="grid gap-4 md:grid-cols-3">
                     <label className="block">
-                      <span className={labelClass}>Serie guia</span>
+                      <span className={labelClass}>Serie guia (opcional)</span>
                       <input className={inputClass} {...register('guiaSerie')} />
                       {errors.guiaSerie ? (
                         <span className="mt-1 block text-sm text-red-600">
@@ -614,7 +830,7 @@ export function MovimientoFormModal({
                       ) : null}
                     </label>
                     <label className="block">
-                      <span className={labelClass}>Numero guia</span>
+                      <span className={labelClass}>Numero guia (opcional)</span>
                       <input className={inputClass} {...register('guiaNumero')} />
                       {errors.guiaNumero ? (
                         <span className="mt-1 block text-sm text-red-600">
@@ -623,7 +839,7 @@ export function MovimientoFormModal({
                       ) : null}
                     </label>
                     <label className="block">
-                      <span className={labelClass}>Fecha guia</span>
+                      <span className={labelClass}>Fecha guia (opcional)</span>
                       <input className={inputClass} type="date" {...register('guiaFecha')} />
                     </label>
                   </div>
@@ -635,15 +851,16 @@ export function MovimientoFormModal({
                   </p>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <label className="block">
-                      <span className={labelClass}>Tipo comprobante</span>
+                      <span className={labelClass}>Tipo comprobante (opcional)</span>
                       <select className={inputClass} {...register('comprobanteTipo')}>
+                        <option value="">Sin comprobante</option>
                         <option value="FACTURA">Factura</option>
                         <option value="BOLETA">Boleta</option>
                         <option value="OTRO">Otro</option>
                       </select>
                     </label>
                     <label className="block">
-                      <span className={labelClass}>Serie comprobante</span>
+                      <span className={labelClass}>Serie comprobante (opcional)</span>
                       <input className={inputClass} {...register('comprobanteSerie')} />
                       {errors.comprobanteSerie ? (
                         <span className="mt-1 block text-sm text-red-600">
@@ -652,7 +869,7 @@ export function MovimientoFormModal({
                       ) : null}
                     </label>
                     <label className="block">
-                      <span className={labelClass}>Numero comprobante</span>
+                      <span className={labelClass}>Numero comprobante (opcional)</span>
                       <input className={inputClass} {...register('comprobanteNumero')} />
                       {errors.comprobanteNumero ? (
                         <span className="mt-1 block text-sm text-red-600">
@@ -661,7 +878,7 @@ export function MovimientoFormModal({
                       ) : null}
                     </label>
                     <label className="block">
-                      <span className={labelClass}>Fecha emision comprobante</span>
+                      <span className={labelClass}>Fecha emision comprobante (opcional)</span>
                       <input
                         className={inputClass}
                         type="date"
@@ -675,11 +892,11 @@ export function MovimientoFormModal({
                   <p className="mb-3 text-sm font-semibold text-slate-700">Orden y recepcion</p>
                   <div className="grid gap-4 md:grid-cols-3">
                     <label className="block">
-                      <span className={labelClass}>Orden de compra</span>
+                      <span className={labelClass}>Orden de compra (opcional)</span>
                       <input className={inputClass} {...register('ordenCompraNumero')} />
                     </label>
                     <label className="block">
-                      <span className={labelClass}>Fecha pedido</span>
+                      <span className={labelClass}>Fecha pedido (opcional)</span>
                       <input className={inputClass} type="date" {...register('fechaPedido')} />
                     </label>
                     <label className="block">
@@ -698,7 +915,7 @@ export function MovimientoFormModal({
                   <p className="mb-3 text-sm font-semibold text-slate-700">Costos adicionales</p>
                   <div className="grid gap-4 md:grid-cols-3">
                     <label className="block">
-                      <span className={labelClass}>Flete</span>
+                      <span className={labelClass}>Flete (opcional)</span>
                       <input
                         className={inputClass}
                         step="0.000001"
@@ -712,7 +929,7 @@ export function MovimientoFormModal({
                       ) : null}
                     </label>
                     <label className="block">
-                      <span className={labelClass}>Movilidad</span>
+                      <span className={labelClass}>Movilidad (opcional)</span>
                       <input
                         className={inputClass}
                         step="0.000001"
@@ -726,7 +943,7 @@ export function MovimientoFormModal({
                       ) : null}
                     </label>
                     <label className="block">
-                      <span className={labelClass}>Otros gastos</span>
+                      <span className={labelClass}>Otros gastos (opcional)</span>
                       <input
                         className={inputClass}
                         step="0.000001"
@@ -743,7 +960,7 @@ export function MovimientoFormModal({
                 </div>
 
                 <label className="block">
-                  <span className={labelClass}>Observacion documentaria</span>
+                  <span className={labelClass}>Observacion documentaria (opcional)</span>
                   <textarea className={textareaClass} {...register('observacionDocumentaria')} />
                 </label>
               </div>
@@ -761,14 +978,7 @@ export function MovimientoFormModal({
               <button
                 className="inline-flex h-9 items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
                 onClick={() =>
-                  append({
-                    productoId: 0,
-                    ubicacionOrigenId: null,
-                    ubicacionDestinoId: null,
-                    cantidad: 1,
-                    costoUnitario: undefined,
-                    observacion: '',
-                  })
+                  append(createDetalleInicial())
                 }
                 type="button"
               >
@@ -794,7 +1004,9 @@ export function MovimientoFormModal({
                     ) : null}
                     <th className="px-4 py-3">Cantidad</th>
                     <th className="px-4 py-3">
-                      Costo unitario {rules.requireCostoUnitario ? '' : '(opcional)'}
+                      {rules.useCostoAutomatico
+                        ? 'Costo actual'
+                        : `Costo unitario ${rules.requireCostoUnitario ? '' : '(opcional)'}`}
                     </th>
                     <th className="px-4 py-3">Observacion</th>
                     <th className="px-4 py-3 text-right">Acciones</th>
@@ -807,12 +1019,25 @@ export function MovimientoFormModal({
                         <SearchableSelect
                           ariaLabel={`Producto linea ${index + 1}`}
                           emptyLabel="Sin productos"
-                          onChange={(value) =>
+                          onChange={(value) => {
                             setValue(`detalles.${index}.productoId`, value ?? 0, {
                               shouldDirty: true,
                               shouldValidate: true,
                             })
-                          }
+                            if (!value) {
+                              setValue(`detalles.${index}.costoUnitario`, undefined, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              })
+                              setStockLineaState((current) => ({
+                                ...current,
+                                [index]: {
+                                  message: '',
+                                  type: 'info',
+                                },
+                              }))
+                            }
+                          }}
                           onSearch={resolverOpcionesProducto}
                           placeholder="Buscar producto"
                           value={Number(detalles[index]?.productoId || 0) || null}
@@ -837,6 +1062,11 @@ export function MovimientoFormModal({
                               </option>
                             ))}
                           </select>
+                          {!almacenOrigenId ? (
+                            <span className="mt-1 block text-xs leading-5 text-slate-500">
+                              Seleccione el almacen origen en Datos generales para habilitar ubicaciones.
+                            </span>
+                          ) : null}
                         </td>
                       ) : null}
                       {mostrarDestino ? (
@@ -870,11 +1100,14 @@ export function MovimientoFormModal({
                           </span>
                         ) : null}
                       </td>
-                      <td className="min-w-36 px-4 py-3 align-top">
+                      <td className="w-40 min-w-40 px-4 py-3 align-top">
                         <input
                           aria-label={`Costo unitario linea ${index + 1}`}
-                          className={inputClass}
+                          className={`${inputClass.replace('w-full', 'w-36')} ${
+                            rules.useCostoAutomatico ? 'bg-slate-50 text-slate-700' : ''
+                          }`}
                           min="0"
+                          readOnly={rules.useCostoAutomatico}
                           step="0.000001"
                           type="number"
                           {...register(`detalles.${index}.costoUnitario`)}
@@ -882,6 +1115,21 @@ export function MovimientoFormModal({
                         {errors.detalles?.[index]?.costoUnitario ? (
                           <span className="mt-1 block text-sm text-red-600">
                             {errors.detalles[index]?.costoUnitario?.message}
+                          </span>
+                        ) : null}
+                        {rules.useCostoAutomatico && stockLineaState[index]?.message ? (
+                          <span
+                            className={`mt-1 block text-xs leading-5 ${
+                              stockLineaState[index].type === 'success'
+                                ? 'text-emerald-700'
+                                : stockLineaState[index].type === 'warning'
+                                  ? 'text-amber-700'
+                                  : stockLineaState[index].type === 'error'
+                                    ? 'text-red-700'
+                                    : 'text-slate-500'
+                            }`}
+                          >
+                            {stockLineaState[index].message}
                           </span>
                         ) : null}
                       </td>
@@ -926,6 +1174,11 @@ export function MovimientoFormModal({
           </div>
 
           <div className="mt-6 flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+            {stockConfirmError ? (
+              <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 sm:mr-auto sm:w-auto">
+                {stockConfirmError}
+              </div>
+            ) : null}
             <button
               className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
               onClick={onClose}
@@ -944,7 +1197,19 @@ export function MovimientoFormModal({
             <button
               className="inline-flex h-10 items-center justify-center rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
               disabled={isSaving}
-              onClick={handleSubmit((values) => setPendingConfirmValues(values))}
+              onClick={handleSubmit((values) => {
+                if (
+                  rules.useCostoAutomatico &&
+                  values.detalles.some((detalle) => detalle.productoId && !detalle.costoUnitario)
+                ) {
+                  setStockConfirmError(
+                    'No se puede guardar y confirmar una salida sin stock disponible o costo actual.',
+                  )
+                  return
+                }
+
+                setPendingConfirmValues(values)
+              })}
               type="button"
             >
               {isSaving ? 'Procesando...' : 'Guardar y confirmar'}

@@ -42,6 +42,14 @@ const positiveNumber = z.preprocess(
   z.number('Ingrese un numero valido').positive('La cantidad debe ser mayor a 0'),
 )
 
+const optionalComprobanteTipo = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) {
+    return undefined
+  }
+
+  return value
+}, z.enum(TIPOS_COMPROBANTE).optional())
+
 export const movimientoDetalleSchema = z.object({
   productoId: requiredId('Seleccione un producto'),
   ubicacionOrigenId: optionalId,
@@ -67,7 +75,7 @@ export const movimientoSchema = z
     guiaSerie: z.string().trim().optional(),
     guiaNumero: z.string().trim().optional(),
     guiaFecha: z.string().trim().optional(),
-    comprobanteTipo: z.enum(TIPOS_COMPROBANTE).optional(),
+    comprobanteTipo: optionalComprobanteTipo,
     comprobanteSerie: z.string().trim().optional(),
     comprobanteNumero: z.string().trim().optional(),
     comprobanteFechaEmision: z.string().trim().optional(),

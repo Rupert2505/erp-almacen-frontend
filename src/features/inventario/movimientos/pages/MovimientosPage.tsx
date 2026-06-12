@@ -109,8 +109,7 @@ function toPayload(values: MovimientoFormValues, confirmar = false): MovimientoP
     guiaSerie: esEntradaCompra ? values.guiaSerie?.trim() || null : null,
     guiaNumero: esEntradaCompra ? values.guiaNumero?.trim() || null : null,
     guiaFecha: esEntradaCompra ? values.guiaFecha || null : null,
-    comprobanteTipo:
-      esEntradaCompra ? values.comprobanteTipo || 'FACTURA' : null,
+    comprobanteTipo: esEntradaCompra ? values.comprobanteTipo || null : null,
     comprobanteSerie: esEntradaCompra ? values.comprobanteSerie?.trim() || null : null,
     comprobanteNumero: esEntradaCompra ? values.comprobanteNumero?.trim() || null : null,
     comprobanteFechaEmision: esEntradaCompra ? values.comprobanteFechaEmision || null : null,
