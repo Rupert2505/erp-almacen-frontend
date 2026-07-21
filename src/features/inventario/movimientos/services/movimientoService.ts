@@ -112,4 +112,11 @@ export const movimientoService = {
     })
     return unwrapApiData<Movimiento>(data)
   },
+
+  async cancelarMovimiento(id: number, motivoCancelacion: string) {
+    const { data } = await apiClient.patch(`/api/inventario/movimientos/${id}/cancelar`, {
+      motivoCancelacion,
+    })
+    return unwrapApiData<Movimiento>(data)
+  },
 }

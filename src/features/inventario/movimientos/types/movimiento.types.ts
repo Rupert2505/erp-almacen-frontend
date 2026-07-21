@@ -9,7 +9,7 @@ export const TIPOS_MOVIMIENTO = [
   'AJUSTE_NEGATIVO',
 ] as const
 
-export const ESTADOS_MOVIMIENTO = ['BORRADOR', 'CONFIRMADO', 'ANULADO'] as const
+export const ESTADOS_MOVIMIENTO = ['BORRADOR', 'CONFIRMADO', 'ANULADO', 'CANCELADO'] as const
 
 export type TipoMovimiento = (typeof TIPOS_MOVIMIENTO)[number]
 export type EstadoMovimiento = (typeof ESTADOS_MOVIMIENTO)[number]
@@ -75,6 +75,9 @@ export type Movimiento = {
   username?: string | null
   confirmadoEn?: string | null
   anuladoEn?: string | null
+  motivoCancelacion?: string | null
+  canceladoPor?: string | null
+  canceladoEn?: string | null
   creadoEn?: string | null
   actualizadoEn?: string | null
   detalles?: MovimientoDetalle[]

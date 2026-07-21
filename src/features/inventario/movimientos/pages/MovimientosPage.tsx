@@ -10,12 +10,14 @@ import { useAuth } from '../../../auth/context/useAuth'
 import { productoService } from '../../../productos/services/productoService'
 import { proveedorService } from '../../../proveedores/services/proveedorService'
 import { MovimientoAnularModal } from '../components/MovimientoAnularModal'
+import { MovimientoCancelarModal } from '../components/MovimientoCancelarModal'
 import { MovimientoFilters } from '../components/MovimientoFilters'
 import { MovimientoFormModal } from '../components/MovimientoFormModal'
 import { MovimientoTable } from '../components/MovimientoTable'
 import { MovimientoViewModal } from '../components/MovimientoViewModal'
 import type {
   AnularMovimientoValues,
+  CancelarMovimientoValues,
   MovimientoFormValues,
 } from '../schemas/movimientoSchema'
 import {
@@ -148,6 +150,8 @@ export function MovimientosPage() {
   const [confirmMovimiento, setConfirmMovimiento] = useState<Movimiento | null>(null)
   const [anularMovimiento, setAnularMovimiento] = useState<Movimiento | null>(null)
   const [anularError, setAnularError] = useState<string | null>(null)
+  const [cancelarMovimiento, setCancelarMovimiento] = useState<Movimiento | null>(null)
+  const [cancelarError, setCancelarError] = useState<string | null>(null)
   const [viewMovimiento, setViewMovimiento] = useState<Movimiento | null>(null)
   const [isViewOpen, setIsViewOpen] = useState(false)
   const [isViewLoading, setIsViewLoading] = useState(false)
@@ -292,6 +296,37 @@ export function MovimientosPage() {
     },
   })
 
+  const cancelarMutation = useMutation({
+    mutationFn: (values: CancelarMovimientoValues) => {
+      if (!cancelarMovimiento) {
+        throw new Error('No hay movimiento seleccionado')
+      }
+
+      return movimientoService.cancelarMovimiento(
+        cancelarMovimiento.id,
+        values.motivoCancelacion,
+      )
+    },
+    onMutate: () => {
+      setProcessingId(cancelarMovimiento?.id ?? null)
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] })
+      setCancelarMovimiento(null)
+      setCancelarError(null)
+      setFeedback({
+        type: 'success',
+        message: 'Movimiento cancelado correctamente.',
+      })
+    },
+    onError: (error) => {
+      setCancelarError(getMovimientoApiErrorMessage(error))
+    },
+    onSettled: () => {
+      setProcessingId(null)
+    },
+  })
+
   const movimientos = movimientosQuery.data?.content ?? []
   const totalElements = movimientosQuery.data?.totalElements ?? 0
   const totalPages = movimientosQuery.data?.totalPages ?? 0
@@ -427,6 +462,10 @@ export function MovimientosPage() {
           setAnularError(null)
           setAnularMovimiento(movimiento)
         }}
+        onCancelar={(movimiento) => {
+          setCancelarError(null)
+          setCancelarMovimiento(movimiento)
+        }}
         onConfirmar={setConfirmMovimiento}
         onView={openView}
         puedeConfirmarMovimiento={puedeConfirmarMovimiento}
@@ -508,6 +547,22 @@ export function MovimientosPage() {
         }}
         onSubmit={async (values) => {
           await anularMutation.mutateAsync(values)
+        }}
+      />
+
+      <MovimientoCancelarModal
+        errorMessage={cancelarError}
+        isOpen={Boolean(cancelarMovimiento)}
+        isSaving={cancelarMutation.isPending}
+        movimiento={cancelarMovimiento}
+        onClose={() => {
+          if (!cancelarMutation.isPending) {
+            setCancelarMovimiento(null)
+            setCancelarError(null)
+          }
+        }}
+        onSubmit={async (values) => {
+          await cancelarMutation.mutateAsync(values)
         }}
       />
 

@@ -241,7 +241,12 @@ export const anularMovimientoSchema = z.object({
   motivo: z.string().trim().min(1, 'Ingrese el motivo de anulacion'),
 })
 
+export const cancelarMovimientoSchema = z.object({
+  motivoCancelacion: z.string().trim().min(1, 'Ingrese el motivo de cancelacion'),
+})
+
 export type MovimientoFormInput = z.input<typeof movimientoSchema>
 export type MovimientoFormValues = z.infer<typeof movimientoSchema>
 export type AnularMovimientoValues = z.infer<typeof anularMovimientoSchema>
+export type CancelarMovimientoValues = z.infer<typeof cancelarMovimientoSchema>
 export type ComprobanteTipo = (typeof TIPOS_COMPROBANTE)[number]

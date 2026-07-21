@@ -95,6 +95,14 @@ export function MovimientoViewModal({
                 <InfoItem label="Creado en" value={formatDate(movimiento.creadoEn)} />
               </div>
 
+              {movimiento.estado === 'CANCELADO' ? (
+                <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <InfoItem label="Motivo cancelacion" value={movimiento.motivoCancelacion} />
+                  <InfoItem label="Cancelado por" value={movimiento.canceladoPor} />
+                  <InfoItem label="Cancelado en" value={formatDate(movimiento.canceladoEn)} />
+                </div>
+              ) : null}
+
               {movimiento.tipoMovimiento === 'ENTRADA_COMPRA' ? (
                 <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
                   <InfoItem label="Serie guia" value={movimiento.guiaSerie} />

@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, Eye } from 'lucide-react'
+import { Ban, CheckCircle2, Eye, XCircle } from 'lucide-react'
 import type { Movimiento } from '../types/movimiento.types'
 import { formatMovimientoLabel } from '../utils/movimientoLabels'
 
@@ -7,6 +7,7 @@ type MovimientoTableProps = {
   canAnular: boolean
   isLoading: boolean
   onAnular: (movimiento: Movimiento) => void
+  onCancelar: (movimiento: Movimiento) => void
   onConfirmar: (movimiento: Movimiento) => void
   onView: (movimiento: Movimiento) => void
   processingId?: number | null
@@ -33,6 +34,10 @@ function estadoClass(estado: Movimiento['estado']) {
     return 'bg-red-100 text-red-700'
   }
 
+  if (estado === 'CANCELADO') {
+    return 'bg-slate-100 text-slate-600'
+  }
+
   return 'bg-amber-100 text-amber-700'
 }
 
@@ -41,6 +46,7 @@ export function MovimientoTable({
   isLoading,
   movimientos,
   onAnular,
+  onCancelar,
   onConfirmar,
   onView,
   processingId,
@@ -143,15 +149,26 @@ export function MovimientoTable({
 
                           {movimiento.estado === 'BORRADOR' &&
                           puedeConfirmarMovimiento(movimiento) ? (
-                            <button
-                              className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-200 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                              disabled={isProcessing}
-                              onClick={() => onConfirmar(movimiento)}
-                              type="button"
-                            >
-                              <CheckCircle2 size={16} />
-                              Confirmar
-                            </button>
+                            <>
+                              <button
+                                className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-200 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                                disabled={isProcessing}
+                                onClick={() => onConfirmar(movimiento)}
+                                type="button"
+                              >
+                                <CheckCircle2 size={16} />
+                                Confirmar
+                              </button>
+                              <button
+                                className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                                disabled={isProcessing}
+                                onClick={() => onCancelar(movimiento)}
+                                type="button"
+                              >
+                                <XCircle size={16} />
+                                Cancelar
+                              </button>
+                            </>
                           ) : null}
 
                           {movimiento.estado === 'CONFIRMADO' && canAnular ? (

@@ -120,6 +120,9 @@ describe('servicios Axios y respuestas API', () => {
     const post = vi.spyOn(apiClient, 'post').mockResolvedValue({
       data: { success: true, data: { id: 1, numero: 'MOV-1' } },
     })
+    const patch = vi.spyOn(apiClient, 'patch').mockResolvedValue({
+      data: { success: true, data: { id: 1, numero: 'MOV-1', estado: 'CANCELADO' } },
+    })
 
     await movimientoService.getMovimientos({
       page: 0,
@@ -134,6 +137,7 @@ describe('servicios Axios y respuestas API', () => {
       confirmar: true,
       detalles: [{ productoId: 1, cantidad: 1, costoUnitario: 10 }],
     })
+    await movimientoService.cancelarMovimiento(1, 'Error de digitacion')
 
     expect(get).toHaveBeenCalledWith('/api/inventario/movimientos', {
       params: {
@@ -150,6 +154,9 @@ describe('servicios Axios y respuestas API', () => {
       almacenOrigenId: 1,
       confirmar: true,
       detalles: [{ productoId: 1, cantidad: 1, costoUnitario: 10 }],
+    })
+    expect(patch).toHaveBeenCalledWith('/api/inventario/movimientos/1/cancelar', {
+      motivoCancelacion: 'Error de digitacion',
     })
   })
 
