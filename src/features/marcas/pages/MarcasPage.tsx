@@ -4,6 +4,10 @@ import { useMemo, useState } from 'react'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import { can } from '../../../shared/utils/permissions'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+} from '../../../shared/utils/textNormalization'
 import { useAuth } from '../../auth/context/useAuth'
 import { MarcaFilters, type EstadoMarcaFilter } from '../components/MarcaFilters'
 import { MarcaFormModal } from '../components/MarcaFormModal'
@@ -38,9 +42,9 @@ function getActivoFilter(estado: EstadoMarcaFilter) {
 
 function toPayload(values: MarcaFormValues): MarcaPayload {
   return {
-    codigo: values.codigo?.trim() || null,
-    nombre: values.nombre.trim(),
-    descripcion: values.descripcion?.trim() || null,
+    codigo: normalizeOptionalBusinessText(values.codigo),
+    nombre: normalizeBusinessText(values.nombre),
+    descripcion: normalizeOptionalBusinessText(values.descripcion),
   }
 }
 

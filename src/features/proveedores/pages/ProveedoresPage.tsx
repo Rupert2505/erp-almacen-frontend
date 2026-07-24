@@ -4,6 +4,12 @@ import { useMemo, useState } from 'react'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import { can } from '../../../shared/utils/permissions'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+  normalizeOptionalEmail,
+  normalizePhone,
+} from '../../../shared/utils/textNormalization'
 import { useAuth } from '../../auth/context/useAuth'
 import {
   ProveedorFilters,
@@ -44,13 +50,13 @@ function getActivoFilter(estado: EstadoProveedorFilter) {
 
 function toPayload(values: ProveedorFormValues): ProveedorPayload {
   return {
-    tipoDocumento: values.tipoDocumento.trim(),
-    numeroDocumento: values.numeroDocumento.trim(),
-    razonSocial: values.razonSocial.trim(),
-    nombreComercial: values.nombreComercial?.trim() || null,
-    direccion: values.direccion?.trim() || null,
-    telefono: values.telefono?.trim() || null,
-    email: values.email?.trim() || null,
+    tipoDocumento: normalizeBusinessText(values.tipoDocumento),
+    numeroDocumento: normalizeBusinessText(values.numeroDocumento),
+    razonSocial: normalizeBusinessText(values.razonSocial),
+    nombreComercial: normalizeOptionalBusinessText(values.nombreComercial),
+    direccion: normalizeOptionalBusinessText(values.direccion),
+    telefono: normalizePhone(values.telefono),
+    email: normalizeOptionalEmail(values.email),
   }
 }
 

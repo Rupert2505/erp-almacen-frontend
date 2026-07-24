@@ -25,6 +25,15 @@ describe('productoSchema', () => {
     expect(result.marcaId).toBeNull()
   })
 
+  it('permite codigo vacio porque backend lo genera automaticamente', () => {
+    const result = productoSchema.parse({
+      ...baseProducto,
+      codigo: '',
+    })
+
+    expect(result.codigo).toBe('')
+  })
+
   it('requiere familia, tipo de articulo y unidad de medida', () => {
     const result = productoSchema.safeParse({
       ...baseProducto,

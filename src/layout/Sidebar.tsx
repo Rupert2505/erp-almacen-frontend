@@ -14,11 +14,14 @@ import {
   Tags,
   ScrollText,
   ShieldCheck,
+  UserRound,
   Users,
   Warehouse,
   X,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../features/auth/context/useAuth'
+import { can } from '../shared/utils/permissions'
 
 type SidebarProps = {
   isCollapsed: boolean
@@ -63,6 +66,25 @@ const navGroups = [
 ]
 
 export function Sidebar({ isCollapsed, isOpen, onClose, onToggleCollapsed }: SidebarProps) {
+  const { user } = useAuth()
+  const visibleNavGroups = navGroups
+    .map((group) => {
+      if (group.label !== 'Administracion') {
+        return group
+      }
+
+      return {
+        ...group,
+        items: [
+          ...group.items,
+          ...(can(user, 'USUARIO_ADMIN')
+            ? [{ label: 'Personal', to: '/personal', icon: UserRound }]
+            : []),
+        ],
+      }
+    })
+    .filter((group) => group.items.length > 0)
+
   return (
     <>
       <div
@@ -115,7 +137,7 @@ export function Sidebar({ isCollapsed, isOpen, onClose, onToggleCollapsed }: Sid
 
         <nav className={`flex-1 overflow-y-auto py-5 ${isCollapsed ? 'lg:px-3 px-4' : 'px-4'}`}>
           <div className="space-y-6">
-            {navGroups.map((group) => (
+            {visibleNavGroups.map((group) => (
               <div key={group.label}>
                 <p className={`mb-2 px-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 ${isCollapsed ? 'lg:sr-only' : ''}`}>
                   {group.label}

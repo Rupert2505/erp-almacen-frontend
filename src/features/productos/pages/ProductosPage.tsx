@@ -21,6 +21,10 @@ import {
 import { unidadMedidaService } from '../services/unidadMedidaService'
 import type { ProductoFormValues } from '../schemas/productoSchema'
 import type { Producto, ProductoPayload } from '../types/producto.types'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+} from '../../../shared/utils/textNormalization'
 
 const PAGE_SIZE = 10
 
@@ -48,9 +52,8 @@ function getActivoFilter(estado: EstadoProductoFilter) {
 
 function toPayload(values: ProductoFormValues): ProductoPayload {
   return {
-    codigo: values.codigo.trim(),
-    nombre: values.nombre.trim(),
-    descripcion: values.descripcion?.trim() || null,
+    nombre: normalizeBusinessText(values.nombre),
+    descripcion: normalizeOptionalBusinessText(values.descripcion),
     tipoArticuloId: values.tipoArticuloId,
     familiaId: values.familiaId,
     subfamiliaId: values.subfamiliaId ?? null,

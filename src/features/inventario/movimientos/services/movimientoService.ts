@@ -14,6 +14,9 @@ type BackendErrorPayload = {
   data?: unknown
 }
 
+const CONFLICT_ERROR_MESSAGE =
+  'El registro fue modificado por otro usuario. Actualice la informacion e intente nuevamente.'
+
 const emptyPage = <T>(page: number, size: number): PageResponse<T> => ({
   content: [],
   totalElements: 0,
@@ -43,6 +46,7 @@ export function normalizeMovimientoPage<T>(
 export function getMovimientoApiErrorMessage(error: unknown) {
   if (axios.isAxiosError<BackendErrorPayload>(error)) {
     const payload = error.response?.data
+    const status = error.response?.status
 
     if (payload?.message) {
       return payload.message
@@ -63,12 +67,20 @@ export function getMovimientoApiErrorMessage(error: unknown) {
       }
     }
 
+    if (status === 409) {
+      return CONFLICT_ERROR_MESSAGE
+    }
+
     if (!error.response) {
       return 'No se pudo conectar con el backend. Verifique que este activo y que CORS permita el acceso.'
     }
   }
 
   return 'Ocurrio un error inesperado. Intente nuevamente.'
+}
+
+export function isMovimientoConflictError(error: unknown) {
+  return axios.isAxiosError(error) && error.response?.status === 409
 }
 
 export const movimientoService = {

@@ -4,6 +4,7 @@ import { Boxes, Lock, User } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Navigate, useLocation } from 'react-router-dom'
+import logoBallenaIcon from '../../../assets/images/logo_ballena_02.png'
 import { useAuth } from '../context/useAuth'
 import { loginSchema, type LoginFormValues } from '../schemas/loginSchema'
 
@@ -54,8 +55,8 @@ export function LoginPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10">
       <section className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm md:grid-cols-[1fr_420px]">
-        <div className="hidden bg-slate-900 px-10 py-12 text-white md:block">
-          <div className="mb-10 flex items-center gap-3">
+        <div className="hidden bg-slate-900 px-10 py-10 text-white md:block">
+          <div className="mb-8 flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-md bg-cyan-500 text-slate-950">
               <Boxes size={24} />
             </span>
@@ -64,23 +65,28 @@ export function LoginPage() {
               <h1 className="text-2xl font-semibold">Control operativo</h1>
             </div>
           </div>
-          <div className="mt-16 max-w-md">
-            <p className="text-sm uppercase tracking-[0.18em] text-slate-400">Acceso seguro</p>
-            <h2 className="mt-4 text-3xl font-semibold leading-tight">
-              Gestion de almacen clara, ordenada y lista para crecer.
-            </h2>
-            <p className="mt-4 text-sm leading-6 text-slate-300">
-              Base frontend conectada al backend Spring Boot con autenticacion JWT,
-              rutas protegidas y layout principal para los modulos del ERP.
-            </p>
+          <div className="flex h-56 items-center justify-center">
+            <div className="rounded-full bg-gradient-to-br from-cyan-300/24 via-cyan-500/8 to-slate-950/0 p-px shadow-[0_22px_76px_rgba(8,145,178,0.16)]">
+              <div className="grid h-52 w-52 place-items-center rounded-full bg-[radial-gradient(circle_at_center,rgba(240,249,255,0.2),rgba(186,230,253,0.14)_46%,rgba(56,189,248,0.055)_72%)]">
+                <img
+                  alt="Ballena Carrocerias"
+                  className="h-44 w-44 object-contain drop-shadow-2xl"
+                  src={logoBallenaIcon}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="px-6 py-8 sm:px-10">
           <div className="mb-8 md:hidden">
             <div className="mb-3 flex items-center gap-3 text-slate-900">
-              <span className="grid h-10 w-10 place-items-center rounded-md bg-slate-900 text-cyan-300">
-                <Boxes size={22} />
+              <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-md border border-slate-200 bg-white">
+                <img
+                  alt="Ballena Carrocerias"
+                  className="h-10 w-10 object-contain"
+                  src={logoBallenaIcon}
+                />
               </span>
               <div>
                 <p className="text-sm font-medium text-slate-500">ERP Almacen</p>
@@ -102,6 +108,7 @@ export function LoginPage() {
                 <input
                   autoComplete="username"
                   className="h-11 min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400"
+                  data-preserve-case="true"
                   placeholder="admin"
                   {...register('username')}
                 />

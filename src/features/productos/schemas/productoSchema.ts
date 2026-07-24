@@ -54,7 +54,7 @@ const requiredTipoArticuloId = z.preprocess(
 
 export const productoSchema = z
   .object({
-    codigo: z.string().trim().min(1, 'El codigo es obligatorio'),
+    codigo: z.string().trim().nullable().optional(),
     nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
     descripcion: z.string().trim().optional(),
     tipoArticuloId: requiredTipoArticuloId,

@@ -150,7 +150,11 @@ export function UsuarioFormModal({
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
                 <span className={labelClass}>Username</span>
-                <input className={inputClass} {...createForm.register('username')} />
+                <input
+                  className={inputClass}
+                  data-preserve-case="true"
+                  {...createForm.register('username')}
+                />
                 {createForm.formState.errors.username ? (
                   <span className="mt-1 block text-sm text-red-600">
                     {createForm.formState.errors.username.message}

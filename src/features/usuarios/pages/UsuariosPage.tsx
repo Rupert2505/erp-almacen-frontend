@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import { can } from '../../../shared/utils/permissions'
+import { normalizeBusinessText, normalizeEmail } from '../../../shared/utils/textNormalization'
 import { useAuth } from '../../auth/context/useAuth'
 import type { CambiarRolesValues } from '../schemas/cambiarRolesSchema'
 import type { ResetPasswordValues } from '../schemas/resetPasswordSchema'
@@ -55,9 +56,9 @@ function toCreatePayload(values: UsuarioCreateValues): UsuarioCreatePayload {
   return {
     username: values.username.trim(),
     password: values.password,
-    nombres: values.nombres.trim(),
-    apellidos: values.apellidos.trim(),
-    email: values.email.trim(),
+    nombres: normalizeBusinessText(values.nombres),
+    apellidos: normalizeBusinessText(values.apellidos),
+    email: normalizeEmail(values.email),
     activo: values.activo,
     rolesIds: values.rolesIds,
   }
@@ -65,9 +66,9 @@ function toCreatePayload(values: UsuarioCreateValues): UsuarioCreatePayload {
 
 function toUpdatePayload(values: UsuarioEditValues): UsuarioUpdatePayload {
   return {
-    nombres: values.nombres.trim(),
-    apellidos: values.apellidos.trim(),
-    email: values.email.trim(),
+    nombres: normalizeBusinessText(values.nombres),
+    apellidos: normalizeBusinessText(values.apellidos),
+    email: normalizeEmail(values.email),
     activo: values.activo,
   }
 }

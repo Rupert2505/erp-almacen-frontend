@@ -29,6 +29,7 @@ const labelClass = 'mb-2 block text-sm font-medium text-slate-700'
 
 const defaultValues: FamiliaFormInput = {
   nombre: '',
+  prefijo: '',
   descripcion: '',
 }
 
@@ -39,6 +40,7 @@ function valuesFromFamilia(familia?: Familia | null): FamiliaFormInput {
 
   return {
     nombre: familia.nombre,
+    prefijo: familia.prefijo ?? '',
     descripcion: familia.descripcion ?? '',
   }
 }
@@ -99,13 +101,28 @@ export function FamiliaFormModal({
             </div>
           ) : null}
 
-          <label className="block">
-            <span className={labelClass}>Nombre</span>
-            <input className={inputClass} {...register('nombre')} />
-            {errors.nombre ? (
-              <span className="mt-1 block text-sm text-red-600">{errors.nombre.message}</span>
-            ) : null}
-          </label>
+          <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
+            <label className="block">
+              <span className={labelClass}>Nombre</span>
+              <input className={inputClass} {...register('nombre')} />
+              {errors.nombre ? (
+                <span className="mt-1 block text-sm text-red-600">{errors.nombre.message}</span>
+              ) : null}
+            </label>
+
+            <label className="block">
+              <span className={labelClass}>Prefijo</span>
+              <input
+                className={inputClass}
+                maxLength={20}
+                placeholder="REP"
+                {...register('prefijo')}
+              />
+              {errors.prefijo ? (
+                <span className="mt-1 block text-sm text-red-600">{errors.prefijo.message}</span>
+              ) : null}
+            </label>
+          </div>
 
           <label className="mt-4 block">
             <span className={labelClass}>Descripcion</span>

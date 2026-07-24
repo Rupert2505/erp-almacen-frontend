@@ -22,6 +22,7 @@ import type {
 } from '../schemas/movimientoSchema'
 import {
   getMovimientoApiErrorMessage,
+  isMovimientoConflictError,
   movimientoService,
 } from '../services/movimientoService'
 import type {
@@ -220,6 +221,22 @@ export function MovimientosPage() {
       }),
   })
 
+  const refreshMovimientoAfterConflict = async (movimientoId?: number | null) => {
+    await queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] })
+
+    if (!movimientoId || viewMovimiento?.id !== movimientoId) {
+      return
+    }
+
+    try {
+      const detalleActualizado = await movimientoService.getMovimiento(movimientoId)
+      setViewMovimiento(detalleActualizado)
+    } catch {
+      setIsViewOpen(false)
+      setViewMovimiento(null)
+    }
+  }
+
   const createMutation = useMutation({
     mutationFn: ({
       confirmar,
@@ -239,8 +256,12 @@ export function MovimientosPage() {
           : 'Movimiento guardado en borrador.',
       })
     },
-    onError: (error) => {
+    onError: async (error) => {
       setFormError(getMovimientoApiErrorMessage(error))
+
+      if (isMovimientoConflictError(error)) {
+        await refreshMovimientoAfterConflict()
+      }
     },
   })
 
@@ -257,11 +278,15 @@ export function MovimientosPage() {
         message: 'Movimiento confirmado correctamente.',
       })
     },
-    onError: (error) => {
+    onError: async (error, movimiento) => {
       setFeedback({
         type: 'error',
         message: getMovimientoApiErrorMessage(error),
       })
+
+      if (isMovimientoConflictError(error)) {
+        await refreshMovimientoAfterConflict(movimiento.id)
+      }
     },
     onSettled: () => {
       setProcessingId(null)
@@ -288,8 +313,12 @@ export function MovimientosPage() {
         message: 'Movimiento anulado correctamente.',
       })
     },
-    onError: (error) => {
+    onError: async (error) => {
       setAnularError(getMovimientoApiErrorMessage(error))
+
+      if (isMovimientoConflictError(error)) {
+        await refreshMovimientoAfterConflict(anularMovimiento?.id)
+      }
     },
     onSettled: () => {
       setProcessingId(null)
@@ -319,8 +348,12 @@ export function MovimientosPage() {
         message: 'Movimiento cancelado correctamente.',
       })
     },
-    onError: (error) => {
+    onError: async (error) => {
       setCancelarError(getMovimientoApiErrorMessage(error))
+
+      if (isMovimientoConflictError(error)) {
+        await refreshMovimientoAfterConflict(cancelarMovimiento?.id)
+      }
     },
     onSettled: () => {
       setProcessingId(null)

@@ -1,6 +1,7 @@
 export type Familia = {
   id: number
   nombre: string
+  prefijo: string
   descripcion?: string | null
   activo: boolean
   creadoEn?: string | null
@@ -9,6 +10,7 @@ export type Familia = {
 
 export type FamiliaPayload = {
   nombre: string
+  prefijo: string
   descripcion?: string | null
 }
 

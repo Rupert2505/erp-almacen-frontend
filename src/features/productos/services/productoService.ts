@@ -91,6 +91,19 @@ export const productoService = {
     return unwrapApiData<Producto>(data)
   },
 
+  async getSiguienteCodigo(familiaId: number) {
+    const { data } = await apiClient.get('/api/productos/siguiente-codigo', {
+      params: { familiaId },
+    })
+    const value = unwrapApiData<string | { codigo?: string; siguienteCodigo?: string }>(data)
+
+    if (typeof value === 'string') {
+      return value
+    }
+
+    return value.siguienteCodigo ?? value.codigo ?? ''
+  },
+
   async createProducto(payload: ProductoPayload) {
     const { data } = await apiClient.post('/api/productos', payload)
     return unwrapApiData<Producto>(data)

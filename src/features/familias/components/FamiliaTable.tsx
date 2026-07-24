@@ -33,6 +33,7 @@ export function FamiliaTable({
           <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Nombre</th>
+              <th className="px-4 py-3">Prefijo</th>
               <th className="px-4 py-3">Descripcion</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
@@ -41,7 +42,7 @@ export function FamiliaTable({
           <tbody className="divide-y divide-slate-100 bg-white">
             {isLoading ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500" colSpan={4}>
+                <td className="px-4 py-8 text-center text-slate-500" colSpan={5}>
                   Cargando familias...
                 </td>
               </tr>
@@ -49,7 +50,7 @@ export function FamiliaTable({
 
             {!isLoading && familias.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500" colSpan={4}>
+                <td className="px-4 py-8 text-center text-slate-500" colSpan={5}>
                   No se encontraron familias.
                 </td>
               </tr>
@@ -70,6 +71,11 @@ export function FamiliaTable({
                     >
                       <td className="min-w-56 px-4 py-3 font-medium text-slate-900">
                         {familia.nombre}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-700">
+                          {familia.prefijo}
+                        </span>
                       </td>
                       <td className="min-w-72 px-4 py-3 text-slate-600">
                         {familia.descripcion ?? '-'}

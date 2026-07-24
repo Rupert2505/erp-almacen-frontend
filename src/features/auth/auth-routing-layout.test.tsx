@@ -122,21 +122,22 @@ describe('auth, rutas protegidas y layout', () => {
   it('Sidebar renderiza opciones principales y toggle de colapso', async () => {
     const onToggleCollapsed = vi.fn()
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Sidebar
-          isCollapsed={false}
-          isOpen
-          onClose={vi.fn()}
-          onToggleCollapsed={onToggleCollapsed}
-        />
-      </MemoryRouter>,
+    renderWithAuth(
+      { isAuthenticated: true, status: 'authenticated', user: adminUser },
+      ['/dashboard'],
+      <Sidebar
+        isCollapsed={false}
+        isOpen
+        onClose={vi.fn()}
+        onToggleCollapsed={onToggleCollapsed}
+      />,
     )
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Productos')).toBeInTheDocument()
     expect(screen.getByText('Movimientos')).toBeInTheDocument()
     expect(screen.getByText('Usuarios')).toBeInTheDocument()
+    expect(screen.getByText('Personal')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Contraer menu' }))
     expect(onToggleCollapsed).toHaveBeenCalled()

@@ -4,6 +4,10 @@ import { useMemo, useState } from 'react'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import { can } from '../../../shared/utils/permissions'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+} from '../../../shared/utils/textNormalization'
 import { useAuth } from '../../auth/context/useAuth'
 import { SubfamiliaFormModal } from '../../subfamilias/components/SubfamiliaFormModal'
 import { SubfamiliaTable } from '../../subfamilias/components/SubfamiliaTable'
@@ -68,16 +72,17 @@ function getActivoSubfamiliaFilter(estado: EstadoSubfamiliaFilter) {
 
 function toFamiliaPayload(values: FamiliaFormValues): FamiliaPayload {
   return {
-    nombre: values.nombre.trim(),
-    descripcion: values.descripcion?.trim() || null,
+    nombre: normalizeBusinessText(values.nombre),
+    prefijo: normalizeBusinessText(values.prefijo),
+    descripcion: normalizeOptionalBusinessText(values.descripcion),
   }
 }
 
 function toSubfamiliaPayload(values: SubfamiliaFormValues): SubfamiliaPayload {
   return {
     familiaId: values.familiaId,
-    nombre: values.nombre.trim(),
-    descripcion: values.descripcion?.trim() || null,
+    nombre: normalizeBusinessText(values.nombre),
+    descripcion: normalizeOptionalBusinessText(values.descripcion),
   }
 }
 

@@ -5,6 +5,10 @@ import { useSearchParams } from 'react-router-dom'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import { can } from '../../../shared/utils/permissions'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+} from '../../../shared/utils/textNormalization'
 import { useAuth } from '../../auth/context/useAuth'
 import {
   UbicacionFilters,
@@ -47,9 +51,9 @@ function getActivoFilter(estado: EstadoUbicacionFilter) {
 function toPayload(values: UbicacionFormValues): UbicacionPayload {
   return {
     almacenId: values.almacenId,
-    codigo: values.codigo.trim(),
-    nombre: values.nombre.trim(),
-    descripcion: values.descripcion?.trim() || null,
+    codigo: normalizeBusinessText(values.codigo),
+    nombre: normalizeBusinessText(values.nombre),
+    descripcion: normalizeOptionalBusinessText(values.descripcion),
   }
 }
 

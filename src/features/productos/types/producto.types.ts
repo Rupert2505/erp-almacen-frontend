@@ -7,6 +7,7 @@ export type Producto = {
   tipoArticuloCodigo?: string | null
   tipoArticuloNombre?: string | null
   familiaId: number
+  familiaPrefijo?: string | null
   familiaNombre?: string | null
   subfamiliaId?: number | null
   subfamiliaNombre?: string | null
@@ -26,7 +27,7 @@ export type Producto = {
 }
 
 export type ProductoPayload = {
-  codigo: string
+  codigo?: string | null
   nombre: string
   descripcion?: string | null
   tipoArticuloId: number

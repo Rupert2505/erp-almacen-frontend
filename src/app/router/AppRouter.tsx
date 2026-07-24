@@ -70,6 +70,11 @@ const UsuariosPage = lazy(() =>
     default: module.UsuariosPage,
   })),
 )
+const PersonalPage = lazy(() =>
+  import('../../features/personal/pages/PersonalPage').then((module) => ({
+    default: module.PersonalPage,
+  })),
+)
 
 function lazyRoute(element: ReactNode) {
   return <Suspense fallback={<LoadingScreen />}>{element}</Suspense>
@@ -101,6 +106,7 @@ export function AppRouter() {
         <Route path="/inventario/kardex" element={lazyRoute(<KardexPage />)} />
         <Route path="/reportes/inventario" element={lazyRoute(<ReportesInventarioPage />)} />
         <Route path="/usuarios" element={lazyRoute(<UsuariosPage />)} />
+        <Route path="/personal" element={lazyRoute(<PersonalPage />)} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

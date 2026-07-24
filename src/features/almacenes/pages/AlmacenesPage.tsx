@@ -5,6 +5,10 @@ import { useNavigate } from 'react-router-dom'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import { can } from '../../../shared/utils/permissions'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+} from '../../../shared/utils/textNormalization'
 import { useAuth } from '../../auth/context/useAuth'
 import {
   AlmacenFilters,
@@ -45,10 +49,10 @@ function getActivoFilter(estado: EstadoAlmacenFilter) {
 
 function toPayload(values: AlmacenFormValues): AlmacenPayload {
   return {
-    codigo: values.codigo.trim(),
-    nombre: values.nombre.trim(),
-    direccion: values.direccion?.trim() || null,
-    responsable: values.responsable?.trim() || null,
+    codigo: normalizeBusinessText(values.codigo),
+    nombre: normalizeBusinessText(values.nombre),
+    direccion: normalizeOptionalBusinessText(values.direccion),
+    responsable: normalizeOptionalBusinessText(values.responsable),
   }
 }
 

@@ -26,8 +26,13 @@ import {
   type ProductoFormInput,
   type ProductoFormValues,
 } from '../schemas/productoSchema'
+import { productoService } from '../services/productoService'
 import type { Producto } from '../types/producto.types'
 import type { UnidadMedida } from '../types/unidadMedida.types'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+} from '../../../shared/utils/textNormalization'
 import { QuickCatalogModal, type QuickCatalogFormValues } from './QuickCatalogModal'
 import { QuickTipoArticuloModal } from './QuickTipoArticuloModal'
 
@@ -58,7 +63,7 @@ const textareaClass =
 const labelClass = 'mb-2 block text-sm font-medium text-slate-700'
 
 const defaultValues: ProductoFormInput = {
-  codigo: '',
+  codigo: null,
   nombre: '',
   descripcion: '',
   tipoArticuloId: 0,
@@ -162,11 +167,19 @@ export function ProductoFormModal({
     queryFn: () => subfamiliaService.getSubfamiliasPorFamilia(selectedFamiliaId),
   })
 
+  const siguienteCodigoQuery = useQuery({
+    enabled: isOpen && mode === 'create' && selectedFamiliaId > 0,
+    queryKey: ['producto-siguiente-codigo', selectedFamiliaId],
+    queryFn: () => productoService.getSiguienteCodigo(selectedFamiliaId),
+    staleTime: 0,
+  })
+
   const createFamiliaMutation = useMutation({
     mutationFn: (values: QuickCatalogFormValues) =>
       familiaService.createFamilia({
-        nombre: values.nombre.trim(),
-        descripcion: values.descripcion?.trim() || null,
+        nombre: normalizeBusinessText(values.nombre),
+        prefijo: normalizeBusinessText(values.prefijo ?? ''),
+        descripcion: normalizeOptionalBusinessText(values.descripcion),
       }),
     onSuccess: async (familia) => {
       queryClient.setQueryData<Familia[]>(['familias-activas'], (current) =>
@@ -193,8 +206,8 @@ export function ProductoFormModal({
 
       return subfamiliaService.createSubfamilia({
         familiaId: selectedFamiliaId,
-        nombre: values.nombre.trim(),
-        descripcion: values.descripcion?.trim() || null,
+        nombre: normalizeBusinessText(values.nombre),
+        descripcion: normalizeOptionalBusinessText(values.descripcion),
       })
     },
     onSuccess: async (subfamilia) => {
@@ -224,8 +237,8 @@ export function ProductoFormModal({
     mutationFn: (values: QuickCatalogFormValues) =>
       marcaService.createMarca({
         codigo: buildMarcaCodigo(values.nombre),
-        nombre: values.nombre.trim(),
-        descripcion: values.descripcion?.trim() || null,
+        nombre: normalizeBusinessText(values.nombre),
+        descripcion: normalizeOptionalBusinessText(values.descripcion),
       }),
     onSuccess: async (marca) => {
       queryClient.setQueryData<Marca[]>(['marcas-activas'], (current) =>
@@ -246,9 +259,9 @@ export function ProductoFormModal({
   const createTipoArticuloMutation = useMutation({
     mutationFn: (values: TipoArticuloFormValues) =>
       tipoArticuloService.createTipoArticulo({
-        codigo: values.codigo.trim(),
-        nombre: values.nombre.trim(),
-        descripcion: values.descripcion?.trim() || null,
+        codigo: normalizeBusinessText(values.codigo),
+        nombre: normalizeBusinessText(values.nombre),
+        descripcion: normalizeOptionalBusinessText(values.descripcion),
       }),
     onSuccess: async (tipoArticulo) => {
       queryClient.setQueryData<TipoArticulo[]>(['tipos-articulo-activos'], (current) =>
@@ -303,6 +316,14 @@ export function ProductoFormModal({
   }
 
   const subfamilias = subfamiliasQuery.data ?? []
+  const codigoPreview =
+    mode === 'edit'
+      ? producto?.codigo ?? ''
+      : selectedFamiliaId <= 0
+        ? 'Seleccione una familia'
+        : siguienteCodigoQuery.isLoading
+          ? 'Calculando codigo...'
+          : siguienteCodigoQuery.data || 'Se generara al guardar'
 
   const openQuickModal = (type: QuickCatalogType) => {
     setQuickError(null)
@@ -383,10 +404,23 @@ export function ProductoFormModal({
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className={labelClass}>Codigo</span>
-              <input className={inputClass} {...register('codigo')} />
-              {errors.codigo ? (
-                <span className="mt-1 block text-sm text-red-600">{errors.codigo.message}</span>
+              <span className={labelClass}>
+                {mode === 'edit' ? 'Codigo' : 'Codigo sugerido'}
+              </span>
+              <input
+                className={`${inputClass} bg-slate-50 font-semibold text-slate-700`}
+                readOnly
+                value={codigoPreview}
+              />
+              {mode === 'create' ? (
+                <span className="mt-1 block text-xs text-slate-500">
+                  El codigo definitivo se asignara automaticamente al guardar.
+                </span>
+              ) : null}
+              {siguienteCodigoQuery.isError ? (
+                <span className="mt-1 block text-sm text-amber-700">
+                  No se pudo obtener la vista previa. El backend asignara el codigo al guardar.
+                </span>
               ) : null}
             </label>
 
@@ -660,6 +694,7 @@ export function ProductoFormModal({
         onSubmit={handleQuickSubmit}
         readonlyLabel={quickModal === 'subfamilia' ? 'Familia' : undefined}
         readonlyValue={quickModal === 'subfamilia' ? selectedFamilia?.nombre : undefined}
+        requirePrefijo={quickModal === 'familia'}
         title={
           quickModal === 'familia'
             ? 'Nueva familia'

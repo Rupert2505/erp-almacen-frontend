@@ -159,7 +159,7 @@ export function ProveedorFormModal({
 
             <label className="block">
               <span className={labelClass}>Telefono</span>
-              <input className={inputClass} {...register('telefono')} />
+              <input className={inputClass} type="tel" {...register('telefono')} />
               {errors.telefono ? (
                 <span className="mt-1 block text-sm text-red-600">{errors.telefono.message}</span>
               ) : null}

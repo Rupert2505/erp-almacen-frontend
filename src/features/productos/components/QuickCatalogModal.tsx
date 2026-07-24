@@ -1,21 +1,60 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-const quickCatalogSchema = z.object({
-  nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
-  descripcion: z.string().trim().optional(),
-})
+function buildQuickCatalogSchema(requirePrefijo: boolean) {
+  return z
+    .object({
+      nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+      prefijo: z.string().trim().optional(),
+      descripcion: z.string().trim().optional(),
+    })
+    .superRefine((values, context) => {
+      if (!requirePrefijo) {
+        return
+      }
 
-export type QuickCatalogFormValues = z.infer<typeof quickCatalogSchema>
+      if (!values.prefijo) {
+        context.addIssue({
+          code: 'custom',
+          message: 'El prefijo es obligatorio',
+          path: ['prefijo'],
+        })
+        return
+      }
+
+      if (values.prefijo.length > 20) {
+        context.addIssue({
+          code: 'custom',
+          message: 'El prefijo no puede superar 20 caracteres',
+          path: ['prefijo'],
+        })
+      }
+
+      if (!/^[A-Za-z0-9]+$/.test(values.prefijo)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'El prefijo solo puede contener letras y numeros',
+          path: ['prefijo'],
+        })
+      }
+    })
+}
+
+export type QuickCatalogFormValues = {
+  nombre: string
+  prefijo?: string
+  descripcion?: string
+}
 
 type QuickCatalogModalProps = {
   errorMessage?: string | null
   helperText?: string
   isOpen: boolean
   isSaving: boolean
+  requirePrefijo?: boolean
   readonlyLabel?: string
   readonlyValue?: string
   title: string
@@ -33,6 +72,7 @@ const labelClass = 'mb-2 block text-sm font-medium text-slate-700'
 
 const defaultValues: QuickCatalogFormValues = {
   nombre: '',
+  prefijo: '',
   descripcion: '',
 }
 
@@ -43,10 +83,15 @@ export function QuickCatalogModal({
   isSaving,
   onClose,
   onSubmit,
+  requirePrefijo = false,
   readonlyLabel,
   readonlyValue,
   title,
 }: QuickCatalogModalProps) {
+  const quickCatalogSchema = useMemo(
+    () => buildQuickCatalogSchema(requirePrefijo),
+    [requirePrefijo],
+  )
   const {
     formState: { errors },
     handleSubmit,
@@ -107,6 +152,23 @@ export function QuickCatalogModal({
               <span className="mt-1 block text-sm text-red-600">{errors.nombre.message}</span>
             ) : null}
           </label>
+
+          {requirePrefijo ? (
+            <label className="mt-4 block">
+              <span className={labelClass}>Prefijo</span>
+              <input
+                className={inputClass}
+                maxLength={20}
+                placeholder="REP"
+                {...register('prefijo')}
+              />
+              {errors.prefijo ? (
+                <span className="mt-1 block text-sm text-red-600">
+                  {errors.prefijo.message}
+                </span>
+              ) : null}
+            </label>
+          ) : null}
 
           <label className="mt-4 block">
             <span className={labelClass}>Descripcion</span>

@@ -4,6 +4,10 @@ import { useMemo, useState } from 'react'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import { can } from '../../../shared/utils/permissions'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+} from '../../../shared/utils/textNormalization'
 import { useAuth } from '../../auth/context/useAuth'
 import {
   TipoArticuloFilters,
@@ -44,9 +48,9 @@ function getActivoFilter(estado: EstadoTipoArticuloFilter) {
 
 function toPayload(values: TipoArticuloFormValues): TipoArticuloPayload {
   return {
-    codigo: values.codigo.trim(),
-    nombre: values.nombre.trim(),
-    descripcion: values.descripcion?.trim() || null,
+    codigo: normalizeBusinessText(values.codigo),
+    nombre: normalizeBusinessText(values.nombre),
+    descripcion: normalizeOptionalBusinessText(values.descripcion),
   }
 }
 
