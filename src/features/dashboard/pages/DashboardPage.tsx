@@ -1,126 +1,95 @@
 import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, BarChart3, ClipboardList, Package, Warehouse } from 'lucide-react'
-import { apiClient } from '../../../shared/services/apiClient'
-import { unwrapApiData } from '../../../shared/services/apiResponse'
+import { ClipboardList, Package, ScrollText, Warehouse } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
+import { can } from '../../../shared/utils/permissions'
+import { useAuth } from '../../auth/context/useAuth'
+import { ResumenInventarioCards } from '../../reportes/inventario/components/ResumenInventarioCards'
+import {
+  getReporteInventarioApiErrorMessage,
+  reporteInventarioService,
+} from '../../reportes/inventario/services/reporteInventarioService'
 
-type InventorySummary = Record<string, unknown>
-
-const getNumberValue = (summary: InventorySummary | undefined, keys: string[]) => {
-  if (!summary) {
-    return null
-  }
-
-  for (const key of keys) {
-    const value = summary[key]
-
-    if (typeof value === 'number') {
-      return value
-    }
-
-    if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
-      return Number(value)
-    }
-  }
-
-  return null
-}
-
-async function fetchInventorySummary() {
-  const { data } = await apiClient.get('/api/reportes/inventario/resumen')
-  return unwrapApiData<InventorySummary>(data)
-}
+const shortcuts = [
+  {
+    title: 'Productos',
+    description: 'Catalogo de productos, familias, marcas y tipos de articulo.',
+    to: '/productos',
+    icon: Package,
+    tone: 'bg-cyan-50 text-cyan-700',
+  },
+  {
+    title: 'Movimientos',
+    description: 'Entradas, salidas, ajustes, transferencias y devoluciones.',
+    to: '/inventario/movimientos',
+    icon: ClipboardList,
+    tone: 'bg-indigo-50 text-indigo-700',
+  },
+  {
+    title: 'Stock',
+    description: 'Consulta de existencias por producto, almacen y ubicacion.',
+    to: '/inventario/stock',
+    icon: Warehouse,
+    tone: 'bg-emerald-50 text-emerald-700',
+  },
+  {
+    title: 'Reportes',
+    description: 'Informes de inventario, valorizacion, entradas y salidas.',
+    to: '/reportes/inventario',
+    icon: ScrollText,
+    tone: 'bg-amber-50 text-amber-700',
+  },
+]
 
 export function DashboardPage() {
-  const {
-    data: summary,
-    error,
-    isError,
-    isLoading,
-  } = useQuery({
-    queryKey: ['inventory-summary'],
-    queryFn: fetchInventorySummary,
+  const { user } = useAuth()
+  const canViewReports = can(user, 'REPORTE_VER')
+  const resumenQuery = useQuery({
+    enabled: canViewReports,
+    queryKey: ['reportes', 'inventario', 'resumen'],
+    queryFn: reporteInventarioService.getResumen,
   })
-
-  const metrics = [
-    {
-      title: 'Productos',
-      value: getNumberValue(summary, ['productos', 'totalProductos', 'cantidadProductos']),
-      icon: Package,
-    },
-    {
-      title: 'Stock',
-      value: getNumberValue(summary, ['stock', 'stockTotal', 'unidadesStock']),
-      icon: Warehouse,
-    },
-    {
-      title: 'Movimientos',
-      value: getNumberValue(summary, ['movimientos', 'totalMovimientos']),
-      icon: ClipboardList,
-    },
-    {
-      title: 'Reportes',
-      value: getNumberValue(summary, ['reportes', 'totalReportes']),
-      icon: BarChart3,
-    },
-  ]
-
-  const errorMessage =
-    error instanceof Error
-      ? error.message
-      : 'No se pudo obtener el resumen del inventario.'
 
   return (
     <div>
       <PageHeader
         title="Dashboard"
-        description="Vista inicial del estado operativo del almacen."
+        description="Vista principal de accesos operativos y resumen general del ERP Almacen."
       />
 
-      {isError ? (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <AlertCircle className="mt-0.5 shrink-0" size={18} />
-          <div>
-            <p className="font-semibold">No se pudo cargar el resumen del backend.</p>
-            <p className="mt-1">
-              Verifique que Spring Boot este activo en http://localhost:8080 y que CORS permita
-              solicitudes desde Vite. Detalle: {errorMessage}
-            </p>
-          </div>
+      {resumenQuery.isError ? (
+        <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {getReporteInventarioApiErrorMessage(resumenQuery.error)}
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => {
-          const Icon = metric.icon
+      {canViewReports ? (
+        <div className="mb-6">
+          <ResumenInventarioCards
+            isLoading={resumenQuery.isLoading}
+            resumen={resumenQuery.data}
+          />
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {shortcuts.map((item) => {
+          const Icon = item.icon
 
           return (
-            <Card className="p-5" key={metric.title}>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">{metric.title}</p>
-                  <p className="mt-2 text-3xl font-semibold text-slate-950">
-                    {isLoading ? '...' : metric.value ?? '--'}
-                  </p>
-                </div>
-                <span className="grid h-12 w-12 place-items-center rounded-md bg-slate-100 text-slate-700">
-                  <Icon size={24} />
+            <Link key={item.to} to={item.to}>
+              <Card className="h-full p-5 transition hover:border-cyan-200 hover:bg-cyan-50/30 hover:shadow-md">
+                <span className={`inline-flex h-11 w-11 items-center justify-center rounded-lg ${item.tone}`}>
+                  <Icon size={22} />
                 </span>
-              </div>
-            </Card>
+                <h2 className="mt-4 text-base font-bold text-slate-950">{item.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
+              </Card>
+            </Link>
           )
         })}
       </div>
-
-      <Card className="mt-6 p-6">
-        <h2 className="text-lg font-semibold text-slate-950">Base del ERP</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          La navegacion, autenticacion, persistencia de sesion y rutas protegidas ya estan
-          listas para incorporar los modulos funcionales de productos, inventario, reportes y
-          administracion.
-        </p>
-      </Card>
     </div>
   )
 }

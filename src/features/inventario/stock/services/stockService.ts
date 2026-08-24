@@ -78,6 +78,7 @@ export const stockService = {
       params: {
         page: filters.page,
         size: filters.size,
+        sort: 'fechaUltimoMovimiento,desc',
         texto: filters.texto || undefined,
         productoId: filters.productoId || undefined,
         almacenId: filters.almacenId || undefined,

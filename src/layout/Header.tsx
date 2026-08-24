@@ -36,7 +36,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
             <p className="truncate text-xs text-slate-500">{user?.email}</p>
           </div>
           <button
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-red-800 bg-red-700 px-3 text-sm font-medium text-white transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-200"
             onClick={logout}
             type="button"
           >

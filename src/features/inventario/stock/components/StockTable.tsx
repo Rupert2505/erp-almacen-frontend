@@ -1,3 +1,5 @@
+import { ProductCodeBadge } from '../../../../shared/components/ProductCodeBadge'
+import { formatOptionalCurrency } from '../../../../shared/utils/numberFormat'
 import type { StockItem } from '../types/stock.types'
 
 type StockTableProps = {
@@ -7,11 +9,6 @@ type StockTableProps = {
 
 const numberFormatter = new Intl.NumberFormat('es-PE', {
   maximumFractionDigits: 4,
-})
-
-const moneyFormatter = new Intl.NumberFormat('es-PE', {
-  currency: 'PEN',
-  style: 'currency',
 })
 
 function formatDate(value?: string | null) {
@@ -64,9 +61,7 @@ export function StockTable({ isLoading, rows }: StockTableProps) {
                     <tr className="hover:bg-cyan-50/40" key={row.id}>
                       <td className="min-w-72 px-4 py-3">
                         <div className="space-y-1">
-                          <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                            {row.productoCodigo}
-                          </span>
+                          <ProductCodeBadge code={row.productoCodigo} />
                           <p className="font-medium leading-5 text-slate-950">{row.productoNombre}</p>
                         </div>
                       </td>
@@ -100,9 +95,7 @@ export function StockTable({ isLoading, rows }: StockTableProps) {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
-                        {row.costoPromedio === null || row.costoPromedio === undefined
-                          ? '-'
-                          : moneyFormatter.format(row.costoPromedio)}
+                        {formatOptionalCurrency(row.costoPromedio)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                         {formatDate(row.fechaUltimoMovimiento)}

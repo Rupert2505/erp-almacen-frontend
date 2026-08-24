@@ -1,17 +1,10 @@
+import { ProductCodeBadge } from '../../../../shared/components/ProductCodeBadge'
 import type { ProductoBajoMinimoItem } from '../types/reporteInventario.types'
+import { formatReportDecimal } from '../utils/reportNumberFormat'
 
 type ProductosBajoMinimoTableProps = {
   rows: ProductoBajoMinimoItem[]
   isLoading: boolean
-}
-
-const numberFormatter = new Intl.NumberFormat('es-PE', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-})
-
-function formatNumber(value?: number | null) {
-  return value === undefined || value === null ? '-' : numberFormatter.format(value)
 }
 
 export function ProductosBajoMinimoTable({ isLoading, rows }: ProductosBajoMinimoTableProps) {
@@ -47,9 +40,7 @@ export function ProductosBajoMinimoTable({ isLoading, rows }: ProductosBajoMinim
                 <tr className="hover:bg-amber-50/40" key={`${row.productoId}-${row.almacenId}`}>
                   <td className="min-w-72 px-4 py-3">
                     <div className="space-y-1">
-                      <span className="inline-flex rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                        {row.productoCodigo}
-                      </span>
+                      <ProductCodeBadge code={row.productoCodigo} />
                       <p className="font-medium leading-5 text-slate-950">{row.productoNombre}</p>
                     </div>
                   </td>
@@ -58,14 +49,14 @@ export function ProductosBajoMinimoTable({ isLoading, rows }: ProductosBajoMinim
                     {row.almacenNombre || '-'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
-                    {formatNumber(row.cantidadActual)}
+                    {formatReportDecimal(row.cantidadActual)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
-                    {formatNumber(row.stockMinimo)}
+                    {formatReportDecimal(row.stockMinimo)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
-                      {formatNumber(row.diferencia)}
+                      {formatReportDecimal(row.diferencia)}
                     </span>
                   </td>
                 </tr>

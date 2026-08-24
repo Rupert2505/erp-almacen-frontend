@@ -36,7 +36,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       persistAuthSession(response)
       setUser(response)
       setStatus('authenticated')
-      navigate('/dashboard', { replace: true })
+      navigate('/reportes/inventario', { replace: true })
     },
     [navigate],
   )

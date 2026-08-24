@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Card } from '../../../shared/components/Card'
 import { PageHeader } from '../../../shared/components/PageHeader'
+import { ProductCodeBadge } from '../../../shared/components/ProductCodeBadge'
 import { can } from '../../../shared/utils/permissions'
 import { useAuth } from '../../auth/context/useAuth'
 import {
@@ -384,8 +385,9 @@ export function ProductosPage() {
               {confirmAction.type === 'activar'
                 ? 'Confirme que desea activar el producto'
                 : 'Confirme que desea desactivar el producto'}{' '}
-              <span className="font-semibold text-slate-900">
-                {confirmAction.producto.codigo} - {confirmAction.producto.nombre}
+              <span className="inline-flex flex-wrap items-center gap-2 align-middle font-semibold text-slate-900">
+                <ProductCodeBadge code={confirmAction.producto.codigo} />
+                <span>{confirmAction.producto.nombre}</span>
               </span>
               .
             </p>

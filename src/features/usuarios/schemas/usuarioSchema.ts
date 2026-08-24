@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 const requiredText = (message: string) => z.string().trim().min(1, message)
+const roleIdSchema = z.coerce.number().int().positive()
 
 export const usuarioCreateSchema = z.object({
   username: requiredText('El username es obligatorio'),
@@ -9,7 +10,7 @@ export const usuarioCreateSchema = z.object({
   apellidos: requiredText('Los apellidos son obligatorios'),
   email: requiredText('El email es obligatorio').email('Ingrese un email valido'),
   activo: z.boolean(),
-  rolesIds: z.array(z.number()).min(1, 'Seleccione al menos un rol'),
+  rolesIds: z.array(roleIdSchema).min(1, 'Seleccione al menos un rol'),
 })
 
 export const usuarioEditSchema = z.object({

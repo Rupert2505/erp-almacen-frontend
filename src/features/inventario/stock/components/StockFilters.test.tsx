@@ -96,7 +96,9 @@ describe('StockFilters', () => {
   it('filtra ubicaciones por almacen seleccionado', () => {
     renderFilters({ almacenId: 10 })
 
-    expect(screen.getByRole('option', { name: 'A1-2-10 - Anaquel 10' })).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'B1-1 - Bandeja 1' })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: 'C03 - A1-2-10' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'C02 - B1-1' })).not.toBeInTheDocument()
   })
 })

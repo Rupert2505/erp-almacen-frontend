@@ -84,18 +84,18 @@ export function PersonalFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
       <section className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-6 py-4 text-white">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">
+            <h2 className="text-lg font-semibold text-white">
               {mode === 'create' ? 'Nuevo personal' : 'Editar personal'}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-300">
               Complete los datos administrativos del personal.
             </p>
           </div>
           <button
             aria-label="Cerrar"
-            className="grid h-9 w-9 place-items-center rounded-md text-slate-500 hover:bg-slate-100"
+            className="grid h-9 w-9 place-items-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white"
             onClick={onClose}
             type="button"
           >

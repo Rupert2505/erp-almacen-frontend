@@ -29,7 +29,20 @@ const optionalNumber = z.preprocess((value) => {
   }
 
   return Number(value)
-}, z.number('Ingrese un numero valido').min(0, 'No puede ser negativo').optional())
+}, z.number('Ingrese un numero valido').finite('Ingrese un numero valido').min(0, 'No puede ser negativo').optional())
+
+const optionalCommercialSurcharge = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) {
+    return undefined
+  }
+
+  return Number(value)
+}, z
+  .number('Ingrese un recargo comercial valido')
+  .finite('Ingrese un recargo comercial valido')
+  .min(0, 'El recargo comercial debe ser mayor o igual a 0%')
+  .max(1000, 'El recargo comercial no puede superar 1000%')
+  .optional())
 
 const positiveNumber = z.preprocess(
   (value) => {
@@ -39,7 +52,10 @@ const positiveNumber = z.preprocess(
 
     return Number(value)
   },
-  z.number('Ingrese un numero valido').positive('La cantidad debe ser mayor a 0'),
+  z
+    .number('Ingrese un numero valido')
+    .finite('Ingrese un numero valido')
+    .positive('La cantidad debe ser mayor a 0'),
 )
 
 const optionalComprobanteTipo = z.preprocess((value) => {
@@ -56,6 +72,17 @@ export const movimientoDetalleSchema = z.object({
   ubicacionDestinoId: optionalId,
   cantidad: positiveNumber,
   costoUnitario: optionalNumber,
+  valorUnitarioSinIgv: optionalNumber,
+  tasaIgv: optionalNumber,
+  costoBaseComercialSinIgv: optionalNumber,
+  recargoComercialPct: optionalCommercialSurcharge,
+  igvRecuperable: z.preprocess((value) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined
+    }
+
+    return value
+  }, z.boolean().optional()),
   observacion: z.string().trim().optional(),
 })
 
@@ -87,6 +114,7 @@ export const movimientoSchema = z
     otrosGastos: optionalNumber,
     observacionDocumentaria: z.string().trim().optional(),
     observacion: z.string().trim().optional(),
+    confirmar: z.boolean().default(false),
     detalles: z.array(movimientoDetalleSchema).min(1, 'Agregue al menos un detalle'),
   })
   .superRefine((values, context) => {
@@ -226,14 +254,58 @@ export const movimientoSchema = z
 
     if (values.tipoMovimiento === 'ENTRADA_COMPRA') {
       values.detalles.forEach((detalle, index) => {
-        if (detalle.costoUnitario === undefined || detalle.costoUnitario === null) {
+        if (
+          detalle.valorUnitarioSinIgv === undefined ||
+          detalle.valorUnitarioSinIgv === null
+        ) {
           context.addIssue({
             code: 'custom',
-            message: 'Ingrese el costo unitario',
-            path: ['detalles', index, 'costoUnitario'],
+            message: 'Ingrese el costo de compra unitario sin IGV',
+            path: ['detalles', index, 'valorUnitarioSinIgv'],
+          })
+        }
+
+        if (detalle.tasaIgv === undefined || detalle.tasaIgv === null) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Ingrese la tasa de IGV',
+            path: ['detalles', index, 'tasaIgv'],
           })
         }
       })
+    }
+
+    if (values.tipoMovimiento === 'SALIDA_VENTA') {
+      if (!values.ordenTrabajo?.trim()) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Ingrese la Orden de Servicio (OS)',
+          path: ['ordenTrabajo'],
+        })
+      }
+
+      if (values.confirmar) {
+        values.detalles.forEach((detalle, index) => {
+          if (
+            detalle.costoBaseComercialSinIgv === undefined ||
+            detalle.costoBaseComercialSinIgv === null
+          ) {
+            context.addIssue({
+              code: 'custom',
+              message: 'El producto no tiene costo base comercial sin IGV',
+              path: ['detalles', index, 'costoBaseComercialSinIgv'],
+            })
+          }
+
+          if (detalle.recargoComercialPct === undefined || detalle.recargoComercialPct === null) {
+            context.addIssue({
+              code: 'custom',
+              message: 'Seleccione o ingrese el recargo comercial',
+              path: ['detalles', index, 'recargoComercialPct'],
+            })
+          }
+        })
+      }
     }
   })
 

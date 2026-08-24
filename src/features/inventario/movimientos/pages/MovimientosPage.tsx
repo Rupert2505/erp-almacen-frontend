@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '../../../../shared/components/Card'
 import { PageHeader } from '../../../../shared/components/PageHeader'
+import { toLocalDateTimePayload } from '../../../../shared/utils/dateTime'
 import { can } from '../../../../shared/utils/permissions'
 import { almacenService } from '../../../almacenes/services/almacenService'
 import { ubicacionService } from '../../../almacenes/services/ubicacionService'
@@ -24,6 +26,7 @@ import {
   getMovimientoApiErrorMessage,
   isMovimientoConflictError,
   movimientoService,
+  shouldRefreshMovimientoAfterError,
 } from '../services/movimientoService'
 import type {
   EstadoMovimiento,
@@ -31,8 +34,11 @@ import type {
   MovimientoPayload,
   TipoMovimiento,
 } from '../types/movimiento.types'
+import { buildMovimientoDetallePayload } from '../utils/movimientoPayload'
+import { isValidRecargoComercial } from '../utils/valorizacionComercial'
 
 const PAGE_SIZE = 10
+const PRODUCT_SEARCH_PREFETCH_SIZE = 1000
 
 type Feedback = {
   type: 'success' | 'error'
@@ -50,6 +56,10 @@ function movimientoPermission(tipoMovimiento: TipoMovimiento) {
 
   if (tipoMovimiento === 'TRANSFERENCIA') {
     return 'INVENTARIO_TRANSFERENCIA'
+  }
+
+  if (tipoMovimiento === 'DEVOLUCION_PROVEEDOR') {
+    return 'INVENTARIO_DEVOLUCION_CONFIRMAR'
   }
 
   return 'INVENTARIO_AJUSTE'
@@ -92,17 +102,18 @@ function toPayload(values: MovimientoFormValues, confirmar = false): MovimientoP
     'AJUSTE_NEGATIVO',
   ].includes(tipoMovimiento)
   const usaDatosConsumo = tipoMovimiento === 'SALIDA_CONSUMO'
+  const usaOrdenTrabajo = usaDatosConsumo || tipoMovimiento === 'SALIDA_VENTA'
   const usaResponsables = tipoMovimiento === 'TRANSFERENCIA'
 
   return {
     tipoMovimiento,
-    fechaMovimiento: new Date().toISOString(),
+    fechaMovimiento: toLocalDateTimePayload(),
     proveedorId: usaProveedor ? values.proveedorId : null,
     almacenOrigenId: usaOrigen ? values.almacenOrigenId : null,
     almacenDestinoId: usaDestino ? values.almacenDestinoId : null,
     documentoReferencia: usaDocumentoReferencia ? values.documentoReferencia?.trim() || null : null,
     motivoMovimiento: usaMotivo ? values.motivoMovimiento?.trim() || null : null,
-    ordenTrabajo: usaDatosConsumo ? values.ordenTrabajo?.trim() || null : null,
+    ordenTrabajo: usaOrdenTrabajo ? values.ordenTrabajo?.trim() || null : null,
     areaSolicitante: usaDatosConsumo ? values.areaSolicitante?.trim() || null : null,
     solicitante: usaDatosConsumo ? values.solicitante?.trim() || null : null,
     responsableEntrega: usaResponsables ? values.responsableEntrega?.trim() || null : null,
@@ -127,19 +138,18 @@ function toPayload(values: MovimientoFormValues, confirmar = false): MovimientoP
       esEntradaCompra ? values.observacionDocumentaria?.trim() || null : null,
     confirmar,
     observacion: values.observacion?.trim() || null,
-    detalles: values.detalles.map((detalle) => ({
-      productoId: detalle.productoId,
-      ubicacionOrigenId: usaOrigen ? detalle.ubicacionOrigenId : null,
-      ubicacionDestinoId: usaDestino ? detalle.ubicacionDestinoId : null,
-      cantidad: detalle.cantidad,
-      costoUnitario: detalle.costoUnitario ?? null,
-      observacion: detalle.observacion?.trim() || null,
-    })),
+    detalles: values.detalles.map((detalle) =>
+      buildMovimientoDetallePayload(tipoMovimiento, detalle, {
+        usaDestino,
+        usaOrigen,
+      }),
+    ),
   }
 }
 
 export function MovimientosPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [texto, setTexto] = useState('')
   const [tipoMovimiento, setTipoMovimiento] = useState<TipoMovimiento | ''>('')
@@ -157,10 +167,14 @@ export function MovimientosPage() {
   const [isViewOpen, setIsViewOpen] = useState(false)
   const [isViewLoading, setIsViewLoading] = useState(false)
   const [processingId, setProcessingId] = useState<number | null>(null)
+  const [preparingConfirmId, setPreparingConfirmId] = useState<number | null>(null)
 
-  const canView = can(user, 'STOCK_VER') || can(user, 'KARDEX_VER')
+  const canView =
+    can(user, 'STOCK_VER') || can(user, 'KARDEX_VER') || can(user, 'INVENTARIO_DEVOLUCION_VER')
   const canCreate = hasAnyInventoryPermission(user)
-  const canAnular = can(user, 'INVENTARIO_AJUSTE')
+  const canCreateDevolucion = can(user, 'INVENTARIO_DEVOLUCION_CREAR')
+  const canViewDevolucion = can(user, 'INVENTARIO_DEVOLUCION_VER')
+  const canExportReportes = can(user, 'REPORTE_EXPORTAR')
 
   const filters = useMemo(
     () => ({
@@ -186,7 +200,7 @@ export function MovimientosPage() {
       productoService.getProductos({
         activo: true,
         page: 0,
-        size: 10,
+        size: PRODUCT_SEARCH_PREFETCH_SIZE,
         texto: '',
       }),
   })
@@ -221,8 +235,26 @@ export function MovimientosPage() {
       }),
   })
 
-  const refreshMovimientoAfterConflict = async (movimientoId?: number | null) => {
-    await queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] })
+  const invalidateMovimientoData = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] }),
+      queryClient.invalidateQueries({ queryKey: ['stock-actual'] }),
+      queryClient.invalidateQueries({ queryKey: ['stock-bajo-minimo'] }),
+      queryClient.invalidateQueries({ queryKey: ['kardex'] }),
+      queryClient.invalidateQueries({ queryKey: ['reporte-inventario-resumen'] }),
+      queryClient.invalidateQueries({ queryKey: ['reporte-inventario-movimientos'] }),
+      queryClient.invalidateQueries({ queryKey: ['reporte-inventario-stock-valorizado'] }),
+      queryClient.invalidateQueries({ queryKey: ['reporte-inventario-entradas-proveedor'] }),
+      queryClient.invalidateQueries({ queryKey: ['reporte-inventario-salidas'] }),
+      queryClient.invalidateQueries({ queryKey: ['reportes', 'salidas-por-os'] }),
+      queryClient.invalidateQueries({ queryKey: ['reporte-inventario-productos-bajo-minimo'] }),
+      queryClient.invalidateQueries({ queryKey: ['cantidades-devolucion'] }),
+      queryClient.invalidateQueries({ queryKey: ['devoluciones-proveedor'] }),
+    ])
+  }
+
+  const refreshMovimientoAfterRejection = async (movimientoId?: number | null) => {
+    await invalidateMovimientoData()
 
     if (!movimientoId || viewMovimiento?.id !== movimientoId) {
       return
@@ -246,7 +278,12 @@ export function MovimientosPage() {
       values: MovimientoFormValues
     }) => movimientoService.createMovimiento(toPayload(values, confirmar)),
     onSuccess: async (_movimiento, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] })
+      setPage(0)
+      if (variables.confirmar) {
+        await invalidateMovimientoData()
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] })
+      }
       setIsFormOpen(false)
       setFormError(null)
       setFeedback({
@@ -259,8 +296,8 @@ export function MovimientosPage() {
     onError: async (error) => {
       setFormError(getMovimientoApiErrorMessage(error))
 
-      if (isMovimientoConflictError(error)) {
-        await refreshMovimientoAfterConflict()
+      if (shouldRefreshMovimientoAfterError(error)) {
+        await refreshMovimientoAfterRejection()
       }
     },
   })
@@ -271,21 +308,22 @@ export function MovimientosPage() {
       setProcessingId(movimiento.id)
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] })
+      await invalidateMovimientoData()
       setConfirmMovimiento(null)
       setFeedback({
         type: 'success',
-        message: 'Movimiento confirmado correctamente.',
+        message: 'El movimiento fue confirmado correctamente.',
       })
     },
     onError: async (error, movimiento) => {
+      setConfirmMovimiento(null)
       setFeedback({
         type: 'error',
         message: getMovimientoApiErrorMessage(error),
       })
 
-      if (isMovimientoConflictError(error)) {
-        await refreshMovimientoAfterConflict(movimiento.id)
+      if (shouldRefreshMovimientoAfterError(error)) {
+        await refreshMovimientoAfterRejection(movimiento.id)
       }
     },
     onSettled: () => {
@@ -304,20 +342,30 @@ export function MovimientosPage() {
     onMutate: () => {
       setProcessingId(anularMovimiento?.id ?? null)
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['movimientos-inventario'] })
+    onSuccess: async (movimientoActualizado) => {
+      await invalidateMovimientoData()
+      if (viewMovimiento?.id === movimientoActualizado.id) {
+        setViewMovimiento(movimientoActualizado)
+      }
       setAnularMovimiento(null)
       setAnularError(null)
       setFeedback({
         type: 'success',
-        message: 'Movimiento anulado correctamente.',
+        message:
+          movimientoActualizado.tipoMovimiento === 'DEVOLUCION_PROVEEDOR'
+            ? 'La devolucion fue anulada correctamente y el stock fue restaurado.'
+            : 'El movimiento fue anulado correctamente y el stock fue restaurado.',
       })
     },
     onError: async (error) => {
       setAnularError(getMovimientoApiErrorMessage(error))
 
-      if (isMovimientoConflictError(error)) {
-        await refreshMovimientoAfterConflict(anularMovimiento?.id)
+      if (isMovimientoConflictError(error) && anularMovimiento?.estado !== 'CONFIRMADO') {
+        setAnularMovimiento(null)
+      }
+
+      if (shouldRefreshMovimientoAfterError(error)) {
+        await refreshMovimientoAfterRejection(anularMovimiento?.id)
       }
     },
     onSettled: () => {
@@ -351,8 +399,8 @@ export function MovimientosPage() {
     onError: async (error) => {
       setCancelarError(getMovimientoApiErrorMessage(error))
 
-      if (isMovimientoConflictError(error)) {
-        await refreshMovimientoAfterConflict(cancelarMovimiento?.id)
+      if (shouldRefreshMovimientoAfterError(error)) {
+        await refreshMovimientoAfterRejection(cancelarMovimiento?.id)
       }
     },
     onSettled: () => {
@@ -366,6 +414,42 @@ export function MovimientosPage() {
 
   const puedeConfirmarMovimiento = (movimiento: Movimiento) =>
     can(user, movimientoPermission(movimiento.tipoMovimiento))
+
+  const puedeCancelarMovimiento = (movimiento: Movimiento) =>
+    movimiento.tipoMovimiento === 'DEVOLUCION_PROVEEDOR'
+      ? can(user, 'INVENTARIO_DEVOLUCION_CREAR') ||
+        can(user, 'INVENTARIO_DEVOLUCION_CONFIRMAR')
+      : can(user, movimientoPermission(movimiento.tipoMovimiento))
+
+  const puedeAnularMovimiento = (movimiento: Movimiento) =>
+    movimiento.tipoMovimiento === 'DEVOLUCION_PROVEEDOR'
+      ? can(user, 'INVENTARIO_DEVOLUCION_ANULAR')
+      : can(user, 'INVENTARIO_AJUSTE')
+
+  const viewEntradaPuedeTenerDevolucion =
+    isViewOpen &&
+    viewMovimiento?.tipoMovimiento === 'ENTRADA_COMPRA' &&
+    viewMovimiento.estado === 'CONFIRMADO'
+
+  const cantidadesDevolucionQuery = useQuery({
+    enabled:
+      Boolean(viewMovimiento?.id) &&
+      viewEntradaPuedeTenerDevolucion &&
+      canCreateDevolucion &&
+      canViewDevolucion,
+    queryKey: ['cantidades-devolucion', viewMovimiento?.id],
+    queryFn: () => movimientoService.getCantidadesDevolucion(Number(viewMovimiento?.id)),
+  })
+
+  const showRegistrarDevolucion =
+    viewEntradaPuedeTenerDevolucion &&
+    canCreateDevolucion &&
+    canViewDevolucion &&
+    Boolean(
+      cantidadesDevolucionQuery.data?.some(
+        (detalle) => Number(detalle.cantidadPendienteDevolver ?? 0) > 0,
+      ),
+    )
 
   const handleTextoChange = (value: string) => {
     setTexto(value)
@@ -404,6 +488,83 @@ export function MovimientosPage() {
       setIsViewOpen(false)
     } finally {
       setIsViewLoading(false)
+    }
+  }
+
+  const prepareConfirmacion = async (movimiento: Movimiento) => {
+    setFeedback(null)
+    setPreparingConfirmId(movimiento.id)
+
+    try {
+      const movimientoActual = await movimientoService.getMovimiento(movimiento.id)
+
+      if (movimientoActual.tipoMovimiento === 'SALIDA_VENTA') {
+        if (!movimientoActual.ordenTrabajo?.trim()) {
+          setFeedback({
+            type: 'error',
+            message: 'La Orden de Servicio (OS) es obligatoria para confirmar una salida de venta.',
+          })
+          return
+        }
+
+        const detalles = movimientoActual.detalles ?? []
+        if (detalles.length === 0) {
+          setFeedback({
+            type: 'error',
+            message: 'La salida de venta debe tener al menos un detalle para confirmar.',
+          })
+          return
+        }
+
+        const invalidRecargo = detalles.find(
+          (detalle) => !isValidRecargoComercial(detalle.recargoComercialPct),
+        )
+        if (invalidRecargo) {
+          setFeedback({
+            type: 'error',
+            message:
+              'Todos los detalles deben tener un recargo comercial válido entre 0% y 1000% antes de confirmar.',
+          })
+          return
+        }
+
+        const productoIds = [...new Set(detalles.map((detalle) => detalle.productoId))]
+        if (productoIds.some((productoId) => !Number.isInteger(productoId) || productoId <= 0)) {
+          setFeedback({
+            type: 'error',
+            message: 'Todos los detalles deben tener un producto válido antes de confirmar.',
+          })
+          return
+        }
+
+        const productosActuales = await Promise.all(
+          productoIds.map((productoId) => productoService.getProducto(productoId)),
+        )
+        const productoSinBase = productosActuales.find(
+          (producto) =>
+            producto.costoReferencial === null ||
+            producto.costoReferencial === undefined ||
+            !Number.isFinite(Number(producto.costoReferencial)) ||
+            Number(producto.costoReferencial) < 0,
+        )
+
+        if (productoSinBase) {
+          setFeedback({
+            type: 'error',
+            message: `El producto ${productoSinBase.codigo} no tiene configurado un costo base comercial sin IGV válido.`,
+          })
+          return
+        }
+      }
+
+      setConfirmMovimiento(movimientoActual)
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: getMovimientoApiErrorMessage(error),
+      })
+    } finally {
+      setPreparingConfirmId(null)
     }
   }
 
@@ -488,7 +649,6 @@ export function MovimientosPage() {
       </Card>
 
       <MovimientoTable
-        canAnular={canAnular}
         isLoading={movimientosQuery.isLoading}
         movimientos={movimientos}
         onAnular={(movimiento) => {
@@ -499,10 +659,12 @@ export function MovimientosPage() {
           setCancelarError(null)
           setCancelarMovimiento(movimiento)
         }}
-        onConfirmar={setConfirmMovimiento}
+        onConfirmar={(movimiento) => void prepareConfirmacion(movimiento)}
         onView={openView}
+        puedeAnularMovimiento={puedeAnularMovimiento}
+        puedeCancelarMovimiento={puedeCancelarMovimiento}
         puedeConfirmarMovimiento={puedeConfirmarMovimiento}
-        processingId={processingId}
+        processingId={processingId ?? preparingConfirmId}
       />
 
       <div className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
@@ -558,6 +720,7 @@ export function MovimientosPage() {
       />
 
       <MovimientoViewModal
+        isRegistrarDevolucionLoading={cantidadesDevolucionQuery.isLoading}
         isLoading={isViewLoading}
         isOpen={isViewOpen}
         movimiento={viewMovimiento}
@@ -565,6 +728,13 @@ export function MovimientosPage() {
           setIsViewOpen(false)
           setViewMovimiento(null)
         }}
+        onRegistrarDevolucion={() => {
+          if (viewMovimiento?.id) {
+            navigate(`/inventario/entradas/${viewMovimiento.id}/devolucion`)
+          }
+        }}
+        showPdfButton={canExportReportes}
+        showRegistrarDevolucion={showRegistrarDevolucion}
       />
 
       <MovimientoAnularModal

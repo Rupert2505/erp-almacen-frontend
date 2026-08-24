@@ -1,4 +1,6 @@
 import { CheckCircle2, Edit, PowerOff } from 'lucide-react'
+import { ProductCodeBadge } from '../../../shared/components/ProductCodeBadge'
+import { formatOptionalCurrency } from '../../../shared/utils/numberFormat'
 import type { Producto } from '../types/producto.types'
 
 type ProductoTableProps = {
@@ -12,17 +14,8 @@ type ProductoTableProps = {
   onEdit: (producto: Producto) => void
 }
 
-const moneyFormatter = new Intl.NumberFormat('es-PE', {
-  currency: 'PEN',
-  style: 'currency',
-})
-
 function formatNumber(value?: number | null) {
   return value === null || value === undefined ? '-' : value.toString()
-}
-
-function formatMoney(value?: number | null) {
-  return value === null || value === undefined ? '-' : moneyFormatter.format(value)
 }
 
 export function ProductoTable({
@@ -49,7 +42,12 @@ export function ProductoTable({
               <th className="px-4 py-3">Unidad</th>
               <th className="px-4 py-3 text-right">Stock minimo</th>
               <th className="px-4 py-3 text-right">Stock maximo</th>
-              <th className="px-4 py-3 text-right">Costo referencial</th>
+              <th
+                className="px-4 py-3 text-right"
+                title="Base manual utilizada para calcular el valor comercial de materiales en salidas de venta. No modifica el costo promedio del inventario."
+              >
+                Costo base comercial sin IGV
+              </th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -79,9 +77,7 @@ export function ProductoTable({
                     <tr className="hover:bg-cyan-50/40" key={producto.id}>
                       <td className="min-w-72 px-4 py-3">
                         <div className="space-y-1">
-                          <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                            {producto.codigo}
-                          </span>
+                          <ProductCodeBadge code={producto.codigo} />
                           <p className="font-medium leading-5 text-slate-950">{producto.nombre}</p>
                         </div>
                       </td>
@@ -107,7 +103,7 @@ export function ProductoTable({
                         {formatNumber(producto.stockMaximo)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
-                        {formatMoney(producto.costoReferencial)}
+                        {formatOptionalCurrency(producto.costoReferencial)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span

@@ -1,3 +1,4 @@
+import { ProductCodeBadge } from '../../../../shared/components/ProductCodeBadge'
 import type { StockBajoMinimoItem } from '../types/stock.types'
 
 type StockBajoMinimoTableProps = {
@@ -48,9 +49,7 @@ export function StockBajoMinimoTable({ isLoading, rows }: StockBajoMinimoTablePr
                   >
                     <td className="min-w-72 px-4 py-3">
                       <div className="space-y-1">
-                        <span className="inline-flex rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                          {row.productoCodigo}
-                        </span>
+                        <ProductCodeBadge code={row.productoCodigo} />
                         <p className="font-medium leading-5 text-slate-950">{row.productoNombre}</p>
                       </div>
                     </td>

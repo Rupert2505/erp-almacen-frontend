@@ -12,15 +12,16 @@ const baseMovimiento: Movimiento = {
   fechaMovimiento: '2026-06-12T10:00:00',
 }
 
-function renderTable(movimientos: Movimiento[]) {
+function renderTable(movimientos: Movimiento[], canAnular = true) {
   const props = {
-    canAnular: true,
     isLoading: false,
     movimientos,
     onAnular: vi.fn(),
     onCancelar: vi.fn(),
     onConfirmar: vi.fn(),
     onView: vi.fn(),
+    puedeAnularMovimiento: vi.fn(() => canAnular),
+    puedeCancelarMovimiento: vi.fn(() => true),
     puedeConfirmarMovimiento: vi.fn(() => true),
   }
 
@@ -46,13 +47,20 @@ describe('MovimientoTable', () => {
     expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
   })
 
+  it('CONFIRMADO no muestra Anular sin permiso', () => {
+    renderTable([{ ...baseMovimiento, estado: 'CONFIRMADO' }], false)
+
+    expect(screen.queryByRole('button', { name: 'Anular' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver' })).toBeInTheDocument()
+  })
+
   it('ANULADO y CANCELADO solo permiten ver detalle', () => {
     renderTable([
       { ...baseMovimiento, id: 2, numero: 'MOV-002', estado: 'ANULADO' },
       { ...baseMovimiento, id: 3, numero: 'MOV-003', estado: 'CANCELADO' },
     ])
 
-    expect(screen.getByText('Cancelado')).toHaveClass('bg-slate-100', 'text-slate-600')
+    expect(screen.getByText('Cancelado')).toHaveClass('bg-amber-100', 'text-amber-700')
     expect(screen.getAllByRole('button', { name: 'Ver' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Anular' })).not.toBeInTheDocument()

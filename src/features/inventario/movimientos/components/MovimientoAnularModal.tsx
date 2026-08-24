@@ -1,12 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   anularMovimientoSchema,
   type AnularMovimientoValues,
 } from '../schemas/movimientoSchema'
 import type { Movimiento } from '../types/movimiento.types'
+import { formatMovimientoLabel } from '../utils/movimientoLabels'
 
 type MovimientoAnularModalProps = {
   errorMessage?: string | null
@@ -25,8 +26,10 @@ export function MovimientoAnularModal({
   onClose,
   onSubmit,
 }: MovimientoAnularModalProps) {
+  const [pendingValues, setPendingValues] = useState<AnularMovimientoValues | null>(null)
+  const [isConfirming, setIsConfirming] = useState(false)
   const {
-    formState: { errors },
+    formState: { errors, isSubmitting },
     handleSubmit,
     register,
     reset,
@@ -47,17 +50,26 @@ export function MovimientoAnularModal({
     return null
   }
 
+  const isBusy = isSaving || isSubmitting || isConfirming
+  const almacen =
+    movimiento?.almacenDestinoNombre ??
+    movimiento?.almacenOrigenNombre ??
+    movimiento?.almacenDestinoCodigo ??
+    movimiento?.almacenOrigenCodigo ??
+    '-'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
       <section className="w-full max-w-lg rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-6 py-4 text-white">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Anular movimiento</h2>
-            <p className="mt-1 text-sm text-slate-500">{movimiento?.numero}</p>
+            <h2 className="text-lg font-semibold text-white">Anular movimiento</h2>
+            <p className="mt-1 text-sm text-slate-300">{movimiento?.numero}</p>
           </div>
           <button
             aria-label="Cerrar"
-            className="grid h-9 w-9 place-items-center rounded-md text-slate-500 hover:bg-slate-100"
+            className="grid h-9 w-9 place-items-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white"
+            disabled={isBusy}
             onClick={onClose}
             type="button"
           >
@@ -65,17 +77,44 @@ export function MovimientoAnularModal({
           </button>
         </div>
 
-        <form className="px-6 py-5" onSubmit={handleSubmit(onSubmit)}>
+        <form
+          className="px-6 py-5"
+          onSubmit={handleSubmit((values) => setPendingValues(values))}
+        >
           {errorMessage ? (
             <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {errorMessage}
             </div>
           ) : null}
 
+          <div className="mb-5 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Numero</p>
+              <p className="mt-1 font-semibold text-slate-900">{movimiento?.numero ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tipo</p>
+              <p className="mt-1 font-semibold text-slate-900">
+                {movimiento ? formatMovimientoLabel(movimiento.tipoMovimiento) : '-'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Almacen</p>
+              <p className="mt-1 font-semibold text-slate-900">{almacen}</p>
+            </div>
+          </div>
+
+          <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+            La anulacion intentara revertir completamente esta entrada. Si existen
+            movimientos posteriores que utilizaron su stock o costo promedio, la operacion
+            sera rechazada y debera registrarse una devolucion o un ajuste.
+          </div>
+
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">Motivo</span>
             <textarea
               className="min-h-28 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+              disabled={isBusy}
               {...register('motivo')}
             />
             {errors.motivo ? (
@@ -86,7 +125,7 @@ export function MovimientoAnularModal({
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              disabled={isSaving}
+              disabled={isBusy}
               onClick={onClose}
               type="button"
             >
@@ -94,14 +133,71 @@ export function MovimientoAnularModal({
             </button>
             <button
               className="inline-flex h-10 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
-              disabled={isSaving}
+              disabled={isBusy}
               type="submit"
             >
-              {isSaving ? 'Anulando...' : 'Anular'}
+              {isBusy ? 'Anulando...' : 'Confirmar anulacion'}
             </button>
           </div>
         </form>
       </section>
+
+      {pendingValues ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4">
+          <section
+            aria-labelledby="confirmar-anulacion-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+            role="dialog"
+          >
+            <h2 className="text-lg font-semibold text-slate-950" id="confirmar-anulacion-title">
+              Confirmar anulación
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              ¿Está seguro de anular el movimiento{' '}
+              <span className="font-semibold text-slate-900">{movimiento?.numero ?? '-'}</span>?
+              Esta acción revertirá su efecto en el stock y el kardex.
+            </p>
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Motivo</p>
+              <p className="mt-1 text-sm text-slate-800">{pendingValues.motivo}</p>
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                disabled={isSaving || isConfirming}
+                onClick={() => setPendingValues(null)}
+                type="button"
+              >
+                No, volver
+              </button>
+              <button
+                className="inline-flex h-10 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={isSaving || isConfirming}
+                onClick={async () => {
+                  if (isConfirming) {
+                    return
+                  }
+
+                  setIsConfirming(true)
+
+                  try {
+                    await onSubmit(pendingValues)
+                  } catch {
+                    // El contenedor conserva y muestra el mensaje funcional del servicio.
+                  } finally {
+                    setIsConfirming(false)
+                    setPendingValues(null)
+                  }
+                }}
+                type="button"
+              >
+                {isSaving || isConfirming ? 'Anulando...' : 'Sí, anular movimiento'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

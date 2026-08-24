@@ -1,28 +1,25 @@
 import { Ban, CheckCircle2, Eye, XCircle } from 'lucide-react'
+import { MovementNumberBadge } from '../../../../shared/components/MovementNumberBadge'
+import { MovementTypeBadge } from '../../../../shared/components/MovementTypeBadge'
+import { formatApiDateTime } from '../../../../shared/utils/dateTime'
 import type { Movimiento } from '../types/movimiento.types'
 import { formatMovimientoLabel } from '../utils/movimientoLabels'
 
 type MovimientoTableProps = {
   movimientos: Movimiento[]
-  canAnular: boolean
   isLoading: boolean
   onAnular: (movimiento: Movimiento) => void
   onCancelar: (movimiento: Movimiento) => void
   onConfirmar: (movimiento: Movimiento) => void
   onView: (movimiento: Movimiento) => void
   processingId?: number | null
+  puedeAnularMovimiento: (movimiento: Movimiento) => boolean
+  puedeCancelarMovimiento: (movimiento: Movimiento) => boolean
   puedeConfirmarMovimiento: (movimiento: Movimiento) => boolean
 }
 
 function formatDate(value?: string | null) {
-  if (!value) {
-    return '-'
-  }
-
-  return new Intl.DateTimeFormat('es-PE', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(value))
+  return formatApiDateTime(value)
 }
 
 function estadoClass(estado: Movimiento['estado']) {
@@ -35,14 +32,13 @@ function estadoClass(estado: Movimiento['estado']) {
   }
 
   if (estado === 'CANCELADO') {
-    return 'bg-slate-100 text-slate-600'
+    return 'bg-amber-100 text-amber-700'
   }
 
   return 'bg-amber-100 text-amber-700'
 }
 
 export function MovimientoTable({
-  canAnular,
   isLoading,
   movimientos,
   onAnular,
@@ -50,6 +46,8 @@ export function MovimientoTable({
   onConfirmar,
   onView,
   processingId,
+  puedeAnularMovimiento,
+  puedeCancelarMovimiento,
   puedeConfirmarMovimiento,
 }: MovimientoTableProps) {
   return (
@@ -93,12 +91,13 @@ export function MovimientoTable({
                   return (
                     <tr className="hover:bg-cyan-50/40" key={movimiento.id}>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <span className="font-semibold text-slate-950">{movimiento.numero}</span>
+                        <MovementNumberBadge number={movimiento.numero} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                          {formatMovimientoLabel(movimiento.tipoMovimiento)}
-                        </span>
+                        <MovementTypeBadge
+                          label={formatMovimientoLabel(movimiento.tipoMovimiento)}
+                          type={movimiento.tipoMovimiento}
+                        />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span
@@ -148,30 +147,36 @@ export function MovimientoTable({
                           </button>
 
                           {movimiento.estado === 'BORRADOR' &&
-                          puedeConfirmarMovimiento(movimiento) ? (
+                          (puedeConfirmarMovimiento(movimiento) ||
+                            puedeCancelarMovimiento(movimiento)) ? (
                             <>
-                              <button
-                                className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-200 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                                disabled={isProcessing}
-                                onClick={() => onConfirmar(movimiento)}
-                                type="button"
-                              >
-                                <CheckCircle2 size={16} />
-                                Confirmar
-                              </button>
-                              <button
-                                className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"
-                                disabled={isProcessing}
-                                onClick={() => onCancelar(movimiento)}
-                                type="button"
-                              >
-                                <XCircle size={16} />
-                                Cancelar
-                              </button>
+                              {puedeConfirmarMovimiento(movimiento) ? (
+                                <button
+                                  className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-200 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                                  disabled={isProcessing}
+                                  onClick={() => onConfirmar(movimiento)}
+                                  type="button"
+                                >
+                                  <CheckCircle2 size={16} />
+                                  Confirmar
+                                </button>
+                              ) : null}
+                              {puedeCancelarMovimiento(movimiento) ? (
+                                <button
+                                  className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-300 px-3 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                                  disabled={isProcessing}
+                                  onClick={() => onCancelar(movimiento)}
+                                  type="button"
+                                >
+                                  <XCircle size={16} />
+                                  Cancelar
+                                </button>
+                              ) : null}
                             </>
                           ) : null}
 
-                          {movimiento.estado === 'CONFIRMADO' && canAnular ? (
+                          {movimiento.estado === 'CONFIRMADO' &&
+                          puedeAnularMovimiento(movimiento) ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
                               disabled={isProcessing}

@@ -2,13 +2,17 @@
 
 ## 1. Descripcion general
 
-El frontend del ERP Almacen es una aplicacion web desarrollada con React, TypeScript y Vite. Es un proyecto separado del backend Spring Boot y consume una API REST protegida mediante JWT.
+El frontend del ERP Almacen es una aplicacion web desarrollada con React, TypeScript y Vite. Es un proyecto independiente del backend Spring Boot y consume una API REST protegida con JWT mediante el header:
 
-La aplicacion cubre los flujos principales de operacion del almacen: autenticacion, catalogos, inventario, consultas, reportes y administracion de usuarios. Su objetivo es ofrecer una interfaz tipo ERP, profesional, sobria y orientada a productividad.
+```http
+Authorization: Bearer <token>
+```
 
-URLs locales actuales:
+La aplicacion cubre los flujos principales del MVP operativo del almacen: autenticacion, dashboard, catalogos, inventario, stock, kardex, reportes y administracion.
 
-```bash
+Entornos locales actuales:
+
+```text
 Backend:  http://localhost:8080
 Frontend: http://localhost:5173
 ```
@@ -17,17 +21,19 @@ Frontend: http://localhost:5173
 
 | Tecnologia | Uso |
 | --- | --- |
-| React | Construccion de interfaz |
-| TypeScript | Tipado estatico |
-| Vite | Dev server, build y bundling |
-| React Router | Rutas publicas y protegidas |
+| React 19 | Construccion de interfaz |
+| TypeScript | Tipado estatico y contratos frontend |
+| Vite | Desarrollo local, build y bundling |
+| React Router | Rutas publicas, protegidas y lazy loading |
 | Axios | Cliente HTTP centralizado |
-| TanStack Query | Cache, loading y sincronizacion de datos remotos |
+| TanStack Query | Cache, loading, refetch y sincronizacion con API |
 | React Hook Form | Manejo de formularios |
-| Zod | Validacion de formularios |
+| Zod | Validacion declarativa de formularios |
 | Tailwind CSS | Estilos utilitarios |
 | Lucide React | Iconografia |
-| ESLint | Revision estatica de codigo |
+| Vitest | Pruebas unitarias y de componentes |
+| Testing Library | Pruebas de UI |
+| ESLint | Revision estatica |
 
 ## 3. Estructura de carpetas
 
@@ -41,98 +47,85 @@ src/
     router/
       AppRouter.tsx
       ProtectedRoute.tsx
+  assets/
+    logo_ballena_02.png
   layout/
     Header.tsx
     MainLayout.tsx
     Sidebar.tsx
   features/
     auth/
-      context/
-      pages/
-      schemas/
-      services/
-      types/
     dashboard/
-      pages/
     productos/
-      components/
-      pages/
-      schemas/
-      services/
-      types/
+    familias/
+    subfamilias/
+    tipos-articulo/
+    marcas/
     proveedores/
-      components/
-      pages/
-      schemas/
-      services/
-      types/
     almacenes/
-      components/
-      pages/
-      schemas/
-      services/
-      types/
     inventario/
-      kardex/
       movimientos/
-      pages/
       stock/
+      kardex/
+      pages/
     reportes/
       inventario/
       pages/
     usuarios/
-      components/
-      pages/
-      schemas/
-      services/
-      types/
+    personal/
   shared/
     components/
-      Card.tsx
-      LoadingScreen.tsx
-      PageHeader.tsx
+    hooks/
     services/
-      apiClient.ts
-      apiResponse.ts
     utils/
-      permissions.ts
-      storageKeys.ts
   styles/
     globals.css
+docs/
+  frontend-documentation.md
+  frontend-routes.md
+  frontend-modules.md
+  frontend-deployment-notes.md
 ```
 
 ## 4. Arquitectura frontend
 
-La arquitectura se organiza por funcionalidades dentro de `src/features`. Cada modulo contiene sus propias paginas, componentes, servicios, tipos y validaciones cuando aplica.
+La arquitectura esta organizada por dominio funcional dentro de `src/features`. Cada modulo concentra sus paginas, componentes, servicios, esquemas Zod y tipos TypeScript.
 
-Capas principales:
-
-- `app`: configuracion global, providers y router.
-- `layout`: estructura visual comun del ERP.
-- `features`: modulos funcionales aislados por dominio.
-- `shared`: componentes, servicios y utilidades reutilizables.
-- `styles`: estilos globales.
-
-El patron principal es:
+Flujo principal:
 
 ```text
 Page -> Components -> Services -> apiClient -> Backend REST
 ```
 
-TanStack Query administra consultas, cache, estados de carga y refetch. React Hook Form y Zod administran formularios y validaciones.
+Responsabilidades por capa:
+
+| Capa | Responsabilidad |
+| --- | --- |
+| `app` | Providers globales, router y configuracion de entorno |
+| `layout` | Layout ERP, header, sidebar y contenedor principal |
+| `features` | Modulos funcionales por dominio |
+| `shared/components` | Componentes reutilizables |
+| `shared/services` | Axios centralizado y helpers de respuesta |
+| `shared/hooks` | Hooks globales, como normalizacion visual a mayusculas |
+| `shared/utils` | Permisos, storage keys y normalizacion de texto |
 
 ## 5. Manejo de rutas
 
-Las rutas se definen en `src/app/router/AppRouter.tsx`.
+Las rutas estan declaradas en:
+
+```text
+src/app/router/AppRouter.tsx
+```
 
 La aplicacion usa:
 
-- `BrowserRouter` en `AppProviders`.
-- `Routes` y `Route` de React Router.
-- `ProtectedRoute` para proteger las rutas privadas.
-- `React.lazy` y `Suspense` para cargar paginas bajo demanda.
+- `BrowserRouter` desde `AppProviders`.
+- `ProtectedRoute` para rutas privadas.
+- `MainLayout` como contenedor de las rutas autenticadas.
+- `React.lazy` y `Suspense` para carga por modulo.
+- `LoadingScreen` como fallback de carga.
 
-La ruta raiz `/` redirige a `/dashboard`.
+La ruta raiz `/` redirige a `/reportes/inventario`.
 
 ## 6. Rutas publicas y protegidas
 
@@ -145,9 +138,12 @@ Ruta publica:
 Rutas protegidas:
 
 ```text
-/
-/dashboard
+/dashboard -> redirige a /reportes/inventario
 /productos
+/familias
+/subfamilias -> redirige a /familias
+/tipos-articulo
+/marcas
 /proveedores
 /almacenes
 /ubicaciones
@@ -156,9 +152,10 @@ Rutas protegidas:
 /inventario/kardex
 /reportes/inventario
 /usuarios
+/personal
 ```
 
-Cualquier ruta no reconocida redirige a `/dashboard`.
+La ruta comodin `*` redirige a `/reportes/inventario`.
 
 ## 7. Autenticacion JWT
 
@@ -168,53 +165,40 @@ El login consume:
 POST /api/auth/login
 ```
 
-El backend devuelve datos de usuario y token JWT:
+El usuario autenticado queda representado por token, datos basicos, roles y permisos. El token se guarda actualmente en `localStorage`.
 
-```json
-{
-  "accessToken": "...",
-  "tokenType": "Bearer",
-  "expiresIn": 3600,
-  "username": "admin",
-  "nombres": "Administrador",
-  "apellidos": "Sistema",
-  "email": "admin@erpalmacen.local",
-  "roles": ["ADMIN"],
-  "permisos": ["PRODUCTO_VER"]
-}
-```
-
-El token se almacena actualmente en `localStorage`. Axios lo agrega automaticamente en cada request:
-
-```http
-Authorization: Bearer <token>
-```
-
-## 8. Manejo de sesion
-
-La sesion se administra en `AuthContext`.
-
-Flujo al iniciar la aplicacion:
-
-1. Se revisa si existe token en `localStorage`.
-2. Si existe token, se consulta:
+Al iniciar la aplicacion, si existe token, se consulta:
 
 ```http
 GET /api/auth/me
 ```
 
-3. Si el token es valido, se restaura el usuario.
-4. Si el token es invalido, se limpia la sesion.
+Si la respuesta es valida, la sesion se restaura. Si no es valida, se limpia el storage.
 
-Cuando el backend responde `401`, el interceptor de Axios:
+## 8. Manejo de sesion
 
-- elimina token y usuario del storage;
-- dispara un evento interno de no autorizado;
-- redirige a `/login`.
+La sesion vive en `AuthContext`.
+
+Flujo:
+
+1. Login exitoso guarda token y usuario.
+2. Axios adjunta el token en cada request.
+3. Rutas privadas leen el estado de autenticacion.
+4. Logout limpia token y usuario.
+5. Si el backend responde `401`, el interceptor limpia sesion y redirige a `/login`.
+
+Claves de storage:
+
+```text
+AUTH_ACCESS_TOKEN_KEY
+AUTH_USER_KEY
+AUTH_UNAUTHORIZED_EVENT
+SIDEBAR_COLLAPSED_KEY
+```
 
 ## 9. Axios y cliente HTTP
 
-El cliente HTTP centralizado esta en:
+Cliente centralizado:
 
 ```text
 src/shared/services/apiClient.ts
@@ -222,13 +206,13 @@ src/shared/services/apiClient.ts
 
 Responsabilidades:
 
-- definir `baseURL` desde variables de entorno;
-- establecer `Content-Type: application/json`;
-- adjuntar `Authorization` si existe token;
-- manejar respuestas `401`;
-- propagar errores para que las paginas los muestren.
+- usar `VITE_API_BASE_URL`;
+- enviar `Content-Type: application/json`;
+- adjuntar `Authorization: Bearer <token>`;
+- manejar `401`;
+- propagar errores de negocio para que cada pantalla los muestre claramente.
 
-El helper `unwrapApiData` adapta respuestas del backend con formato:
+El backend suele responder con envelope:
 
 ```json
 {
@@ -238,76 +222,99 @@ El helper `unwrapApiData` adapta respuestas del backend con formato:
 }
 ```
 
+El helper `unwrapApiData` devuelve `data` cuando la respuesta viene envuelta.
+
 ## 10. Manejo de permisos
 
-Los permisos se validan desde:
+Helpers:
 
 ```text
 src/shared/utils/permissions.ts
 ```
 
-Funciones disponibles:
-
-- `hasPermission(user, permission)`
-- `hasRole(user, role)`
-- `isAdmin(user)`
-- `can(user, permission)`
-
-La funcion `can` permite acceso si el usuario tiene el permiso requerido o rol `ADMIN`.
-
-Ejemplos de permisos usados:
+Funciones:
 
 ```text
-PRODUCTO_VER
-PRODUCTO_CREAR
-PROVEEDOR_VER
-ALMACEN_VER
-STOCK_VER
-KARDEX_VER
-REPORTE_VER
-USUARIO_ADMIN
+hasPermission(user, permission)
+hasRole(user, role)
+isAdmin(user)
+can(user, permission)
 ```
+
+`can` permite acceso si el usuario tiene el permiso requerido o rol `ADMIN`.
+
+Permisos relevantes:
+
+| Area | Permisos |
+| --- | --- |
+| Productos/catalogos | `PRODUCTO_VER`, `PRODUCTO_CREAR`, `PRODUCTO_EDITAR`, `PRODUCTO_DESACTIVAR` |
+| Proveedores | `PROVEEDOR_VER`, `PROVEEDOR_CREAR` |
+| Almacenes/ubicaciones | `ALMACEN_VER`, `USUARIO_ADMIN` |
+| Inventario | `INVENTARIO_ENTRADA`, `INVENTARIO_SALIDA`, `INVENTARIO_TRANSFERENCIA`, `INVENTARIO_AJUSTE` |
+| Stock/Kardex | `STOCK_VER`, `KARDEX_VER` |
+| Reportes | `REPORTE_VER` |
+| Usuarios/Personal | `USUARIO_ADMIN` |
 
 ## 11. Layout general
 
-El layout principal esta compuesto por:
+Componentes:
 
-- `MainLayout`: contenedor general y `Outlet`.
-- `Sidebar`: navegacion lateral por grupos.
-- `Header`: usuario autenticado y accion de cierre de sesion.
+- `MainLayout`: define sidebar, header y `Outlet`.
+- `Sidebar`: menu lateral agrupado por dominio.
+- `Header`: usuario autenticado, acciones de sesion y control movil.
 
-El diseño usa fondo gris claro, tarjetas blancas, sidebar oscuro, espaciado amplio e iconos de Lucide React.
+El sidebar es contraible, conserva preferencia en `localStorage` y muestra solo iconos cuando esta contraido.
 
-## 12. Componentes compartidos
+El login usa el logo `logo_ballena_02` dentro de una composicion visual sobria, con el formulario separado en una columna clara.
 
-Componentes principales en `src/shared/components`:
+## 12. Componentes y utilidades compartidas
 
-- `Card`: contenedor visual reutilizable.
-- `PageHeader`: titulo y descripcion de pagina.
-- `LoadingScreen`: fallback profesional para lazy loading.
+Componentes:
 
-Utilidades compartidas:
+- `Card`
+- `PageHeader`
+- `LoadingScreen`
+- `SearchableSelect`
 
-- `apiClient`: cliente HTTP.
-- `apiResponse`: adaptador de envelope.
-- `permissions`: helpers de permisos.
-- `storageKeys`: claves de storage y eventos internos.
+Hooks:
+
+- `useUppercaseTextInputs`: transforma visualmente campos editables de texto a mayusculas. Respeta `readOnly`, `disabled`, `data-preserve-case`, `email`, `password`, `number`, `date`, `search` y `tel`.
+
+Utilidades:
+
+- `permissions`
+- `storageKeys`
+- `textNormalization`
+
+Normalizacion de texto:
+
+```text
+normalizeBusinessText(value)       -> mayusculas + trim
+normalizeOptionalBusinessText(...) -> mayusculas + trim o null
+normalizeEmail(value)              -> minusculas + trim
+normalizeOptionalEmail(...)        -> minusculas + trim o null
+normalizePhone(...)                -> trim sin cambiar caracteres
+```
 
 ## 13. Modulos implementados
 
 | Modulo | Estado |
 | --- | --- |
-| Login | Funcional |
+| Login | Funcional con JWT, logo y restauracion de sesion |
 | Dashboard | Funcional |
-| Productos | Listado, filtros, crear, editar, activar/desactivar |
-| Proveedores | Listado, filtros, crear, editar, activar/desactivar |
-| Almacenes | Listado, filtros, crear, editar, activar/desactivar |
-| Ubicaciones | Listado, filtros, crear, editar, activar/desactivar |
-| Movimientos | Crear borrador, confirmar, anular, detalle |
-| Stock | Consulta actual y bajo minimo |
-| Kardex | Consulta paginada con filtros |
-| Reportes de inventario | Resumen y reportes tabulares |
-| Usuarios | Crear, editar, roles, reset password, activar/desactivar |
+| Productos | CRUD, filtros, activacion, codigo automatico, familia, subfamilia, tipo de articulo, marca y unidad |
+| Familias y Subfamilias | CRUD, prefijo obligatorio de familia, activacion/desactivacion |
+| Tipos de articulo | CRUD y asociacion a producto |
+| Marcas | CRUD y asociacion a producto |
+| Proveedores | CRUD con validaciones |
+| Almacenes | CRUD y acceso a ubicaciones |
+| Ubicaciones | CRUD, filtro por almacen |
+| Movimientos | Listado, filtros, crear borrador, guardar y confirmar, confirmar, cancelar, anular, detalle |
+| Stock | Consulta actual, bajo minimo, filtros y costo promedio |
+| Kardex | Consulta con filtros por producto, almacen, ubicacion, tipo y fechas |
+| Reportes de inventario | Resumen, stock valorizado, movimientos, entradas, salidas y bajo minimo |
+| Usuarios | CRUD, roles, reset password, detalle y permisos |
+| Personal | CRUD administrativo con permisos `USUARIO_ADMIN` o `ADMIN` |
 
 ## 14. Servicios por modulo
 
@@ -316,7 +323,9 @@ Servicios principales:
 ```text
 authService
 productoService
-categoriaService
+familiaService
+subfamiliaService
+tipoArticuloService
 marcaService
 unidadMedidaService
 proveedorService
@@ -329,63 +338,89 @@ reporteInventarioService
 usuarioService
 rolService
 permisoService
+personalService
 ```
 
-Cada servicio encapsula endpoints REST, transforma respuestas con `unwrapApiData` y normaliza paginas Spring cuando aplica.
+Cada servicio:
+
+- encapsula endpoints REST;
+- usa `apiClient`;
+- transforma envelope con `unwrapApiData`;
+- normaliza paginas Spring cuando el backend responde `Page`;
+- expone mensajes de error por modulo cuando aplica.
 
 ## 15. Tipos TypeScript
 
-Cada modulo declara tipos propios en `types/`.
+Los tipos estan separados por modulo en carpetas `types`.
 
 Ejemplos:
 
-- `Producto`
-- `Proveedor`
-- `Almacen`
-- `Ubicacion`
-- `Movimiento`
-- `StockItem`
-- `KardexItem`
-- `Usuario`
-- `Rol`
-- `Permiso`
+```text
+Producto
+Familia
+Subfamilia
+TipoArticulo
+Marca
+Proveedor
+Almacen
+Ubicacion
+Movimiento
+StockItem
+KardexItem
+ReporteInventario
+Usuario
+Rol
+Permiso
+Personal
+```
 
-Tambien se declaran tipos de payload, filtros y respuestas paginadas.
+Tambien se definen:
+
+- payloads de create/update;
+- filtros por pantalla;
+- `PageResponse<T>`;
+- tipos de estado y acciones de UI.
 
 ## 16. Validaciones con Zod y React Hook Form
 
-Los formularios usan:
+Cada formulario relevante usa React Hook Form con `zodResolver`.
 
-- React Hook Form para estado, errores y submit.
-- Zod para esquemas de validacion.
-- `@hookform/resolvers/zod` como integracion.
+Reglas destacadas:
 
-Validaciones implementadas incluyen:
-
-- campos obligatorios;
+- campos obligatorios por catalogo;
 - email valido;
-- cantidades mayores a cero;
-- costos no negativos;
 - password minimo 8 caracteres;
 - seleccion obligatoria de roles;
-- reglas por tipo de movimiento.
+- cantidad mayor a cero;
+- costos y gastos no negativos;
+- fecha de recepcion no menor que fecha de pedido;
+- serie y numero de documento deben informarse juntos cuando aplica;
+- `ENTRADA_COMPRA` exige proveedor, almacen destino, fecha recepcion y costo unitario;
+- salidas y transferencias no exigen costo unitario manual;
+- familia exige prefijo obligatorio, maximo 20 caracteres y solo letras/numeros;
+- producto exige familia, tipo de articulo y unidad de medida.
 
 ## 17. Manejo de errores
 
-Cada modulo muestra errores backend en bloques visuales claros.
+Patron por modulo:
 
-El patron usual contempla:
+1. Priorizar `message` del backend.
+2. Si no existe, usar `error`.
+3. Si `data` contiene errores de validacion, unirlos en un mensaje claro.
+4. Si no hay respuesta, mostrar mensaje de conexion/CORS/backend apagado.
+5. Mantener modales abiertos cuando falla guardar.
 
-- `message` del backend;
-- `error` del backend;
-- errores de validacion en `data`;
-- mensaje de conexion si no hay respuesta.
+Movimientos contempla `409 CONFLICT` para concurrencia o conflicto de datos. El mensaje esperado es:
 
-No se usan `alert` basicos del navegador para errores funcionales.
+```text
+El registro fue modificado por otro usuario. Actualice la informacion e intente nuevamente.
+```
+
+Luego de conflictos en movimientos, se refrescan datos cuando el flujo actual lo permite.
 
 ## 18. Paginacion
 
-Las pantallas de listado usan paginacion basica compatible con Spring Page:
+Las tablas usan paginacion compatible con Spring Page:
 
 ```json
 {
@@ -397,23 +432,25 @@ Las pantallas de listado usan paginacion basica compatible con Spring Page:
 }
 ```
 
-El frontend usa controles `Anterior` y `Siguiente`, reinicia pagina al cambiar filtros y muestra el total de registros.
+El patron de UI incluye:
+
+- total de registros;
+- botones `Anterior` y `Siguiente`;
+- reinicio a pagina 0 al cambiar filtros;
+- loading durante consultas.
 
 ## 19. Lazy loading y optimizacion de bundle
 
 Las paginas protegidas se cargan con `React.lazy` y `Suspense`.
 
-Pagina publica cargada directamente:
-
-```text
-/login
-```
-
-Paginas lazy:
+Rutas lazy actuales:
 
 ```text
 Dashboard
 Productos
+Familias
+Tipos de articulo
+Marcas
 Proveedores
 Almacenes
 Ubicaciones
@@ -422,41 +459,36 @@ Stock
 Kardex
 Reportes
 Usuarios
+Personal
 ```
 
-Resultado observado tras optimizacion:
-
-- chunk principal bajo aproximadamente de `594.85 kB` a `420.44 kB`;
-- desaparecio el warning de chunk mayor a `500 kB`;
-- cada modulo funcional queda separado en su propio chunk.
+La carga modular redujo el chunk inicial y mantiene cada modulo separado.
 
 ## 20. Variables de entorno
 
-Configuracion actual:
+Archivo de configuracion:
 
 ```text
 src/app/config/env.ts
 ```
 
-Variable soportada:
+Variable principal:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-Ejemplo de `.env.local`:
+Ejemplo `.env.local`:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-Ejemplo para produccion:
+Ejemplo produccion:
 
 ```env
 VITE_API_BASE_URL=https://api.erp-almacen.com
 ```
-
-Nota: las variables expuestas al frontend con Vite deben iniciar con `VITE_`.
 
 ## 21. Comandos de ejecucion
 
@@ -466,7 +498,7 @@ Instalar dependencias:
 npm install
 ```
 
-Ejecutar entorno local:
+Ejecutar en desarrollo:
 
 ```bash
 npm run dev
@@ -478,21 +510,27 @@ Abrir:
 http://localhost:5173
 ```
 
-## 22. Comandos de build y lint
+## 22. Comandos de build, lint y tests
 
-Compilar para produccion:
+Build:
 
 ```bash
 npm run build
 ```
 
-Ejecutar lint:
+Lint:
 
 ```bash
 npm run lint
 ```
 
-Previsualizar build:
+Tests:
+
+```bash
+npm test
+```
+
+Preview:
 
 ```bash
 npm run preview
@@ -501,68 +539,72 @@ npm run preview
 ## 23. Flujo funcional principal
 
 1. Usuario ingresa a `/login`.
-2. Se autentica contra `/api/auth/login`.
+2. Se autentica con usuario/password.
 3. El token JWT se guarda en `localStorage`.
-4. El usuario entra a `/dashboard`.
-5. Las rutas protegidas quedan disponibles segun permisos.
-6. Axios agrega el token en cada request.
-7. Si el token vence o es invalido, se limpia sesion y se redirige a `/login`.
-8. Los modulos consumen servicios REST, muestran tablas, filtros, modales, estados de carga y errores.
+4. Se redirige a `/reportes/inventario`.
+5. El sidebar muestra modulos segun permisos.
+6. Las pantallas consultan backend con TanStack Query.
+7. Los formularios validan con Zod.
+8. Los servicios consumen API con Axios.
+9. Si hay `401`, se limpia sesion y se redirige a `/login`.
+10. Al recargar, `/api/auth/me` restaura la sesion si el token sigue valido.
 
 ## 24. Buenas practicas aplicadas
 
-- Separacion por modulos funcionales.
+- Proyecto frontend separado del backend.
+- Separacion por dominio funcional.
 - Cliente HTTP centralizado.
-- Manejo uniforme de envelope backend.
-- Validaciones declarativas con Zod.
-- Formularios controlados con React Hook Form.
 - Rutas protegidas.
+- Permisos visibles en UI.
 - Lazy loading por modulo.
-- Tipos TypeScript por dominio.
-- Permisos en UI.
-- Mensajes de error visibles.
-- No acoplar frontend al backend como monolito.
-- Componentes compartidos para layout y estados comunes.
+- Validaciones declarativas.
+- Servicios y tipos por modulo.
+- Normalizacion de texto centralizada.
+- Manejo claro de errores de backend.
+- Tests unitarios y de componentes para flujos criticos.
+- No uso de `alert` basico para flujos funcionales.
+- Diseño ERP sobrio, consistente y responsivo.
 
 ## 25. Deuda tecnica y mejoras futuras
 
-Recomendaciones detectadas:
-
-- Crear componentes compartidos para tablas, paginacion, confirmaciones y badges de estado.
-- Centralizar normalizacion de paginas Spring para evitar duplicacion en servicios.
-- Evaluar refresh token o estrategia de renovacion de sesion.
-- Evaluar mover tokens a cookies HttpOnly si el backend lo soporta.
-- Agregar pruebas unitarias y pruebas E2E para flujos criticos.
-- Agregar manejo global de notificaciones tipo toast.
-- Agregar Error Boundary para fallos inesperados por modulo.
-- Revisar accesibilidad de modales, foco y navegacion por teclado.
-- Configurar variables de entorno por ambiente.
-- Preparar Dockerfile o pipeline CI/CD.
+- Crear tabla reutilizable generica para reducir duplicacion visual.
+- Centralizar paginacion en un componente compartido.
+- Crear confirmacion modal generica reutilizable.
+- Agregar sistema de toast global.
+- Evaluar Error Boundary por modulo.
+- Evaluar refresh token o cookies HttpOnly si backend lo soporta.
+- Agregar pruebas E2E cuando el MVP este estable.
+- Revisar accesibilidad de modales y foco.
+- Documentar contratos de API por modulo.
+- Preparar Dockerfile y pipeline CI/CD.
+- Separar configuraciones por ambiente.
 
 ## 26. Checklist antes de despliegue
 
 - Ejecutar `npm run lint`.
 - Ejecutar `npm run build`.
-- Validar `VITE_API_BASE_URL` del ambiente.
-- Validar CORS en backend para el dominio frontend.
-- Validar expiracion y seguridad del JWT.
-- Validar rutas protegidas con usuario sin permisos.
-- Validar login y logout.
+- Ejecutar `npm test`.
+- Validar `VITE_API_BASE_URL`.
+- Validar CORS del backend.
+- Validar login/logout.
 - Validar recarga en rutas protegidas.
-- Validar operaciones CRUD principales.
-- Validar que `/dist` se sirva con fallback a `index.html`.
+- Validar permisos con usuario no admin.
+- Validar CRUD de catalogos principales.
+- Validar movimientos: borrador, confirmar, cancelar y anular.
+- Validar stock, kardex y reportes.
+- Validar que el servidor web haga fallback a `index.html`.
 - Configurar HTTPS.
-- Configurar headers de seguridad en servidor web.
-- Revisar source maps segun politica del ambiente.
+- Revisar politica de source maps.
+- Revisar headers de seguridad.
 
 ## 27. Proximas fases recomendadas
 
-1. Documentacion general del sistema completo frontend/backend.
-2. Preparacion de despliegue frontend.
+1. Documentacion general frontend/backend.
+2. Preparacion de despliegue.
 3. Dockerizacion del frontend.
-4. Configuracion de CI/CD.
-5. Pruebas automatizadas E2E.
-6. Mejoras de UX transversales: toast, tabla reutilizable, confirm modal generico.
-7. Exportaciones PDF/Excel para reportes.
-8. Observabilidad frontend: logging controlado y metricas.
-
+4. Pipeline CI/CD.
+5. Migracion de datos reales.
+6. Pruebas E2E con datos productivos.
+7. Exportaciones PDF/Excel.
+8. Observabilidad frontend.
+9. Mejoras transversales de UX.

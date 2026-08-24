@@ -15,7 +15,33 @@ type SearchableSelectProps = {
   onChange: (value: number | null, option?: SearchableSelectOption | null) => void
   onSearch: (texto: string) => Promise<SearchableSelectOption[]>
   placeholder?: string
+  prefetchedOptions?: SearchableSelectOption[]
   value?: number | null
+}
+
+const MAX_VISIBLE_OPTIONS = 20
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es-PE')
+    .trim()
+}
+
+function filterPrefetchedOptions(options: SearchableSelectOption[], searchValue: string) {
+  const terms = normalizeSearchText(searchValue).split(/\s+/).filter(Boolean)
+
+  if (terms.length === 0) {
+    return options.slice(0, MAX_VISIBLE_OPTIONS)
+  }
+
+  return options
+    .filter((option) => {
+      const label = normalizeSearchText(option.label)
+      return terms.every((term) => label.includes(term))
+    })
+    .slice(0, MAX_VISIBLE_OPTIONS)
 }
 
 export function SearchableSelect({
@@ -26,10 +52,12 @@ export function SearchableSelect({
   onChange,
   onSearch,
   placeholder = 'Buscar...',
+  prefetchedOptions = [],
   value,
 }: SearchableSelectProps) {
   const inputId = useId()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const latestSearchRef = useRef(0)
   const listboxRef = useRef<HTMLDivElement | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -56,37 +84,32 @@ export function SearchableSelect({
     })
   }
 
-  useEffect(() => {
-    if (!isOpen || disabled) {
+  const searchOptions = async (searchValue: string) => {
+    const searchId = ++latestSearchRef.current
+    const searchText = searchValue.trim()
+
+    if (searchText.length < minSearchLength) {
+      setOptions([])
+      setIsLoading(false)
       return
     }
 
-    let isCurrentSearch = true
-
-    const handler = window.setTimeout(async () => {
-      if (query.trim().length < minSearchLength) {
+    setIsLoading(true)
+    try {
+      const nextOptions = await onSearch(searchText)
+      if (searchId === latestSearchRef.current) {
+        setOptions(nextOptions)
+      }
+    } catch {
+      if (searchId === latestSearchRef.current) {
         setOptions([])
-        return
       }
-
-      setIsLoading(true)
-      try {
-        const nextOptions = await onSearch(query.trim())
-        if (isCurrentSearch) {
-          setOptions(nextOptions)
-        }
-      } finally {
-        if (isCurrentSearch) {
-          setIsLoading(false)
-        }
+    } finally {
+      if (searchId === latestSearchRef.current) {
+        setIsLoading(false)
       }
-    }, 280)
-
-    return () => {
-      isCurrentSearch = false
-      window.clearTimeout(handler)
     }
-  }, [disabled, isOpen, minSearchLength, onSearch, query])
+  }
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -96,6 +119,8 @@ export function SearchableSelect({
         !containerRef.current?.contains(target) &&
         !listboxRef.current?.contains(target)
       ) {
+        latestSearchRef.current += 1
+        setIsLoading(false)
         setIsOpen(false)
       }
     }
@@ -119,6 +144,8 @@ export function SearchableSelect({
   }, [isOpen])
 
   const handleSelect = (option: SearchableSelectOption) => {
+    latestSearchRef.current += 1
+    setIsLoading(false)
     setSelectedOption(option)
     setQuery(option.label)
     setIsOpen(false)
@@ -126,10 +153,16 @@ export function SearchableSelect({
   }
 
   const handleClear = () => {
+    latestSearchRef.current += 1
+    setIsLoading(false)
     setSelectedOption(null)
     setQuery('')
-    setOptions([])
+    setOptions(filterPrefetchedOptions(prefetchedOptions, ''))
     onChange(null, null)
+
+    if (isOpen) {
+      void searchOptions('')
+    }
   }
 
   return (
@@ -146,15 +179,20 @@ export function SearchableSelect({
           className="h-10 w-full rounded-md border border-slate-300 bg-white px-9 text-sm text-slate-950 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-100 disabled:text-slate-500"
           disabled={disabled}
           onChange={(event) => {
-            setQuery(event.target.value)
+            const nextQuery = event.target.value
+
+            setQuery(nextQuery)
             setSelectedOption(null)
-            setOptions([])
+            setOptions(filterPrefetchedOptions(prefetchedOptions, nextQuery))
             updateDropdownPosition()
             setIsOpen(true)
+            void searchOptions(nextQuery)
           }}
           onFocus={() => {
             updateDropdownPosition()
+            setOptions(filterPrefetchedOptions(prefetchedOptions, query))
             setIsOpen(true)
+            void searchOptions(query)
           }}
           placeholder={placeholder}
           role="combobox"
@@ -192,25 +230,23 @@ export function SearchableSelect({
             width: dropdownStyle.width,
           }}
         >
-          {isLoading ? (
+          {isLoading && options.length === 0 ? (
             <div className="px-3 py-2 text-slate-500">Buscando...</div>
           ) : null}
           {!isLoading && options.length === 0 ? (
             <div className="px-3 py-2 text-slate-500">{emptyLabel}</div>
           ) : null}
-          {!isLoading
-            ? options.map((option) => (
-                <button
-                  className="block w-full px-3 py-2 text-left text-slate-700 hover:bg-cyan-50 hover:text-slate-950"
-                  key={option.value}
-                  onClick={() => handleSelect(option)}
-                  role="option"
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))
-            : null}
+          {options.map((option) => (
+            <button
+              className="block w-full px-3 py-2 text-left text-slate-700 hover:bg-cyan-50 hover:text-slate-950"
+              key={option.value}
+              onClick={() => handleSelect(option)}
+              role="option"
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
         </div>,
             document.body,
           )

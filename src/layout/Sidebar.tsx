@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  LayoutDashboard,
   MapPinned,
   Package,
   Shapes,
@@ -20,8 +19,12 @@ import {
   X,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import {
+  canAccessRoute,
+  routeAccess,
+  type RouteAccess,
+} from '../app/router/routeAccess'
 import { useAuth } from '../features/auth/context/useAuth'
-import { can } from '../shared/utils/permissions'
 
 type SidebarProps = {
   isCollapsed: boolean
@@ -33,56 +36,69 @@ type SidebarProps = {
 const navGroups = [
   {
     label: 'Principal',
-    items: [{ label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard }],
+    items: [
+      {
+        label: 'Reporte de inventario',
+        to: '/reportes/inventario',
+        icon: BarChart3,
+        access: routeAccess.reportesInventario,
+      },
+    ],
   },
   {
     label: 'Catalogos',
     items: [
-      { label: 'Productos', to: '/productos', icon: Package },
-      { label: 'Familias y Subfamilias', to: '/familias', icon: Shapes },
-      { label: 'Tipos de articulo', to: '/tipos-articulo', icon: SlidersHorizontal },
-      { label: 'Marcas', to: '/marcas', icon: Tags },
-      { label: 'Proveedores', to: '/proveedores', icon: Truck },
-      { label: 'Almacenes', to: '/almacenes', icon: Building2 },
-      { label: 'Ubicaciones', to: '/ubicaciones', icon: MapPinned },
+      { label: 'Productos', to: '/productos', icon: Package, access: routeAccess.productos },
+      { label: 'Familias y Subfamilias', to: '/familias', icon: Shapes, access: routeAccess.familias },
+      {
+        label: 'Tipos de articulo',
+        to: '/tipos-articulo',
+        icon: SlidersHorizontal,
+        access: routeAccess.tiposArticulo,
+      },
+      { label: 'Marcas', to: '/marcas', icon: Tags, access: routeAccess.marcas },
+      { label: 'Proveedores', to: '/proveedores', icon: Truck, access: routeAccess.proveedores },
+      { label: 'Almacenes', to: '/almacenes', icon: Building2, access: routeAccess.almacenes },
+      { label: 'Ubicaciones', to: '/ubicaciones', icon: MapPinned, access: routeAccess.ubicaciones },
     ],
   },
   {
     label: 'Inventario',
     items: [
-      { label: 'Movimientos', to: '/inventario/movimientos', icon: ClipboardList },
-      { label: 'Stock', to: '/inventario/stock', icon: Warehouse },
-      { label: 'Kardex', to: '/inventario/kardex', icon: ScrollText },
+      {
+        label: 'Movimientos',
+        to: '/inventario/movimientos',
+        icon: ClipboardList,
+        access: routeAccess.movimientos,
+      },
+      { label: 'Stock', to: '/inventario/stock', icon: Warehouse, access: routeAccess.stock },
+      { label: 'Kardex', to: '/inventario/kardex', icon: ScrollText, access: routeAccess.kardex },
     ],
   },
   {
-    label: 'Reportes',
-    items: [{ label: 'Inventario', to: '/reportes/inventario', icon: BarChart3 }],
-  },
-  {
     label: 'Administracion',
-    items: [{ label: 'Usuarios', to: '/usuarios', icon: Users }],
+    items: [
+      { label: 'Usuarios', to: '/usuarios', icon: Users, access: routeAccess.usuarios },
+      { label: 'Personal', to: '/personal', icon: UserRound, access: routeAccess.personal },
+    ],
   },
-]
+] satisfies Array<{
+  label: string
+  items: Array<{
+    access: RouteAccess
+    icon: typeof BarChart3
+    label: string
+    to: string
+  }>
+}>
 
 export function Sidebar({ isCollapsed, isOpen, onClose, onToggleCollapsed }: SidebarProps) {
   const { user } = useAuth()
   const visibleNavGroups = navGroups
-    .map((group) => {
-      if (group.label !== 'Administracion') {
-        return group
-      }
-
-      return {
-        ...group,
-        items: [
-          ...group.items,
-          ...(can(user, 'USUARIO_ADMIN')
-            ? [{ label: 'Personal', to: '/personal', icon: UserRound }]
-            : []),
-        ],
-      }
-    })
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => canAccessRoute(user, item.access)),
+    }))
     .filter((group) => group.items.length > 0)
 
   return (

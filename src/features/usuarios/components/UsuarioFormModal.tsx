@@ -59,7 +59,7 @@ function createValuesFromUsuario(usuario?: Usuario | null): UsuarioCreateInput {
     apellidos: usuario.apellidos,
     email: usuario.email,
     activo: usuario.activo,
-    rolesIds: usuario.roles.map((rol) => rol.id),
+    rolesIds: usuario.roles.map((rol) => String(rol.id)),
   }
 }
 
@@ -115,12 +115,12 @@ export function UsuarioFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
       <section className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-6 py-4 text-white">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">
+            <h2 className="text-lg font-semibold text-white">
               {isCreate ? 'Nuevo usuario' : 'Editar usuario'}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-300">
               {isCreate
                 ? 'Cree una cuenta de acceso y asigne sus roles.'
                 : 'Actualice los datos generales de la cuenta.'}
@@ -128,7 +128,7 @@ export function UsuarioFormModal({
           </div>
           <button
             aria-label="Cerrar"
-            className="grid h-9 w-9 place-items-center rounded-md text-slate-500 hover:bg-slate-100"
+            className="grid h-9 w-9 place-items-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white"
             onClick={onClose}
             type="button"
           >
@@ -211,8 +211,8 @@ export function UsuarioFormModal({
                     <input
                       className="mt-0.5 h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
                       type="checkbox"
-                      value={rol.id}
-                      {...createForm.register('rolesIds', { valueAsNumber: true })}
+                      value={String(rol.id)}
+                      {...createForm.register('rolesIds')}
                     />
                     <span>
                       <span className="block text-sm font-semibold text-slate-800">{rol.nombre}</span>

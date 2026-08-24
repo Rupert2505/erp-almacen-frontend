@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react'
 import type { Almacen } from '../../../almacenes/types/almacen.types'
 import type { Ubicacion } from '../../../almacenes/types/ubicacion.types'
+import { formatUbicacionLabel } from '../../../almacenes/utils/ubicacionLabels'
 import { TIPOS_MOVIMIENTO, type TipoMovimiento } from '../../movimientos/types/movimiento.types'
 import { formatMovimientoLabel } from '../../movimientos/utils/movimientoLabels'
 import type { Producto } from '../../../productos/types/producto.types'
@@ -94,7 +95,7 @@ export function KardexFilters({
           <option value="">Todas</option>
           {ubicacionesFiltradas.map((ubicacion) => (
             <option key={ubicacion.id} value={ubicacion.id}>
-              {ubicacion.codigo} - {ubicacion.nombre}
+              {formatUbicacionLabel(ubicacion)}
             </option>
           ))}
         </select>

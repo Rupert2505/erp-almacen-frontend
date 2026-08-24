@@ -1,3 +1,5 @@
+import { ProductCodeBadge } from '../../../../shared/components/ProductCodeBadge'
+import { formatOptionalCurrency } from '../../../../shared/utils/numberFormat'
 import type { MovimientoDetalle } from '../types/movimiento.types'
 
 type MovimientoDetalleTableProps = {
@@ -6,11 +8,6 @@ type MovimientoDetalleTableProps = {
 
 const numberFormatter = new Intl.NumberFormat('es-PE', {
   maximumFractionDigits: 4,
-})
-
-const moneyFormatter = new Intl.NumberFormat('es-PE', {
-  currency: 'PEN',
-  style: 'currency',
 })
 
 export function MovimientoDetalleTable({ detalles }: MovimientoDetalleTableProps) {
@@ -24,25 +21,32 @@ export function MovimientoDetalleTable({ detalles }: MovimientoDetalleTableProps
               <th className="px-4 py-3">Ubicacion origen</th>
               <th className="px-4 py-3">Ubicacion destino</th>
               <th className="px-4 py-3 text-right">Cantidad</th>
-              <th className="px-4 py-3 text-right">Costo unitario</th>
-              <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-right">Costo inventariable</th>
+              <th className="px-4 py-3 text-right">Valor inventariable</th>
+              <th className="px-4 py-3 text-right">Costo documental</th>
+              <th className="px-4 py-3 text-right">Valor stock</th>
+              <th className="px-4 py-3 text-right">Valor documento</th>
+              <th className="px-4 py-3 text-right">Diferencia</th>
               <th className="px-4 py-3">Observacion</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {detalles.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-slate-500" colSpan={7}>
+                <td className="px-4 py-6 text-center text-slate-500" colSpan={11}>
                   Sin detalles.
                 </td>
               </tr>
             ) : null}
             {detalles.map((detalle) => (
               <tr key={detalle.id}>
-                <td className="min-w-56 px-4 py-3 text-slate-900">
-                  {detalle.productoCodigo
-                    ? `${detalle.productoCodigo} - ${detalle.productoNombre ?? ''}`
-                    : (detalle.productoNombre ?? '-')}
+                <td className="min-w-56 px-4 py-3">
+                  <div className="space-y-1">
+                    {detalle.productoCodigo ? <ProductCodeBadge code={detalle.productoCodigo} /> : null}
+                    <p className="font-medium leading-5 text-slate-950">
+                      {detalle.productoNombre ?? '-'}
+                    </p>
+                  </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                   {detalle.ubicacionOrigenCodigo ?? '-'}
@@ -54,14 +58,24 @@ export function MovimientoDetalleTable({ detalles }: MovimientoDetalleTableProps
                   {numberFormatter.format(detalle.cantidad)}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
-                  {detalle.costoUnitario === null || detalle.costoUnitario === undefined
-                    ? '-'
-                    : moneyFormatter.format(detalle.costoUnitario)}
+                  {formatOptionalCurrency(
+                    detalle.costoUnitarioInventariable ?? detalle.costoUnitario,
+                  )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
-                  {detalle.totalLinea === null || detalle.totalLinea === undefined
-                    ? '-'
-                    : moneyFormatter.format(detalle.totalLinea)}
+                  {formatOptionalCurrency(detalle.totalInventariable ?? detalle.totalLinea)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
+                  {formatOptionalCurrency(detalle.costoDocumentoUnitario)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
+                  {formatOptionalCurrency(detalle.valorStock)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">
+                  {formatOptionalCurrency(detalle.valorDocumento)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-slate-700">
+                  {formatOptionalCurrency(detalle.diferenciaValorizacion)}
                 </td>
                 <td className="min-w-48 px-4 py-3 text-slate-600">
                   {detalle.observacion ?? '-'}

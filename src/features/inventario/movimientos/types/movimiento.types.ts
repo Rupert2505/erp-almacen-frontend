@@ -7,6 +7,7 @@ export const TIPOS_MOVIMIENTO = [
   'TRANSFERENCIA',
   'AJUSTE_POSITIVO',
   'AJUSTE_NEGATIVO',
+  'DEVOLUCION_PROVEEDOR',
 ] as const
 
 export const ESTADOS_MOVIMIENTO = ['BORRADOR', 'CONFIRMADO', 'ANULADO', 'CANCELADO'] as const
@@ -25,9 +26,34 @@ export type MovimientoDetalle = {
   ubicacionDestinoId?: number | null
   ubicacionDestinoCodigo?: string | null
   ubicacionDestinoNombre?: string | null
+  movimientoDetalleOrigenId?: number | null
   cantidad: number
   costoUnitario?: number | null
   totalLinea?: number | null
+  valorUnitarioSinIgv?: number | null
+  tasaIgv?: number | null
+  montoIgvUnitario?: number | null
+  montoIgvTotal?: number | null
+  precioUnitarioConIgv?: number | null
+  igvRecuperable?: boolean | null
+  costoUnitarioInventariable?: number | null
+  totalInventariable?: number | null
+  totalConIgv?: number | null
+  costoDocumentoUnitario?: number | null
+  valorStock?: number | null
+  valorDocumento?: number | null
+  diferenciaValorizacion?: number | null
+  costoBaseComercialSinIgv?: number | null
+  recargoComercialPct?: number | null
+  valorVentaUnitarioSinIgv?: number | null
+  igvUnitario?: number | null
+  precioVentaUnitarioConIgv?: number | null
+  valorVentaTotalSinIgv?: number | null
+  igvTotal?: number | null
+  precioVentaTotalConIgv?: number | null
+  costoInventarioUnitario?: number | null
+  costoInventarioTotal?: number | null
+  diferenciaComercialSinIgv?: number | null
   observacion?: string | null
   creadoEn?: string | null
   actualizadoEn?: string | null
@@ -38,6 +64,8 @@ export type Movimiento = {
   numero: string
   tipoMovimiento: TipoMovimiento
   estado: EstadoMovimiento
+  movimientoOrigenId?: number | null
+  movimientoOrigenNumero?: string | null
   fechaMovimiento?: string | null
   proveedorId?: number | null
   proveedorNumeroDocumento?: string | null
@@ -70,11 +98,15 @@ export type Movimiento = {
   movilidad?: number | null
   otrosGastos?: number | null
   observacionDocumentaria?: string | null
+  fechaDocumento?: string | null
+  numeroNotaCredito?: string | null
   observacion?: string | null
   usuarioId?: number | null
   username?: string | null
   confirmadoEn?: string | null
   anuladoEn?: string | null
+  anuladoPor?: string | null
+  motivoAnulacion?: string | null
   motivoCancelacion?: string | null
   canceladoPor?: string | null
   canceladoEn?: string | null
@@ -89,6 +121,10 @@ export type MovimientoDetallePayload = {
   ubicacionDestinoId?: number | null
   cantidad: number
   costoUnitario?: number | null
+  valorUnitarioSinIgv?: number | null
+  tasaIgv?: number | null
+  igvRecuperable?: boolean | null
+  recargoComercialPct?: number | null
   observacion?: string | null
 }
 
@@ -123,6 +159,42 @@ export type MovimientoPayload = {
   confirmar?: boolean
   observacion?: string | null
   detalles: MovimientoDetallePayload[]
+}
+
+export type DevolucionProveedorDetallePayload = {
+  movimientoDetalleOrigenId: number
+  productoId: number
+  cantidad: number
+  observacion?: string | null
+}
+
+export type DevolucionProveedorPayload = {
+  movimientoOrigenId: number
+  proveedorId?: number | null
+  fechaMovimiento?: string | null
+  fechaDocumento?: string | null
+  numeroNotaCredito?: string | null
+  motivo: string
+  observacion?: string | null
+  confirmar?: boolean
+  detalles: DevolucionProveedorDetallePayload[]
+}
+
+export type MovimientoDetalleDevolucionPendiente = {
+  movimientoDetalleOrigenId: number
+  productoId: number
+  productoCodigo?: string | null
+  productoNombre?: string | null
+  almacenId?: number | null
+  almacenCodigo?: string | null
+  almacenNombre?: string | null
+  ubicacionId?: number | null
+  ubicacionCodigo?: string | null
+  ubicacionNombre?: string | null
+  cantidadRecibida: number
+  cantidadDevueltaConfirmada: number
+  cantidadPendienteDevolver: number
+  costoDocumentoUnitario?: number | null
 }
 
 export type MovimientoFilters = {

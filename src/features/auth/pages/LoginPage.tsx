@@ -32,7 +32,7 @@ export function LoginPage() {
 
   if (isAuthenticated) {
     const state = location.state as LocationState | null
-    return <Navigate to={state?.from?.pathname ?? '/dashboard'} replace />
+    return <Navigate to={state?.from?.pathname ?? '/reportes/inventario'} replace />
   }
 
   const onSubmit = async (values: LoginFormValues) => {

@@ -2,14 +2,17 @@ import axios from 'axios'
 import { apiClient } from '../../../../shared/services/apiClient'
 import { unwrapApiData } from '../../../../shared/services/apiResponse'
 import type {
-  EntradaProveedorItem,
+  EntradaProveedorReporte,
+  KardexValorizadoReporte,
   PageResponse,
   ProductoBajoMinimoItem,
   ReporteInventarioFilters,
   ReporteInventarioResumen,
   ReporteMovimientoItem,
   SalidaInventarioItem,
-  StockValorizadoItem,
+  SalidaInventarioReporte,
+  SalidaValorizadaOsReporteResponse,
+  StockValorizadoReporte,
 } from '../types/reporteInventario.types'
 
 type BackendErrorPayload = {
@@ -48,18 +51,49 @@ function dateEnd(value?: string) {
   return value ? `${value}T23:59:59` : undefined
 }
 
-function reporteParams(filters: ReporteInventarioFilters) {
+function reportDateStart(value?: string) {
+  return value || undefined
+}
+
+function reportDateEnd(value?: string) {
+  return value || undefined
+}
+
+function reporteParams(filters: ReporteInventarioFilters, options?: { plainDates?: boolean }) {
   return {
     page: filters.page,
     size: filters.size,
-    fechaDesde: dateStart(filters.fechaDesde),
-    fechaHasta: dateEnd(filters.fechaHasta),
+    texto: filters.texto || undefined,
+    fechaDesde: options?.plainDates
+      ? reportDateStart(filters.fechaDesde)
+      : dateStart(filters.fechaDesde),
+    fechaHasta: options?.plainDates ? reportDateEnd(filters.fechaHasta) : dateEnd(filters.fechaHasta),
     productoId: filters.productoId || undefined,
     almacenId: filters.almacenId || undefined,
+    ubicacionId: filters.ubicacionId || undefined,
     proveedorId: filters.proveedorId || undefined,
+    familiaId: filters.familiaId || undefined,
+    subfamiliaId: filters.subfamiliaId || undefined,
+    tipoArticuloId: filters.tipoArticuloId || undefined,
+    marcaId: filters.marcaId || undefined,
+    usuarioId: filters.usuarioId || undefined,
     tipoMovimiento: filters.tipoMovimiento || undefined,
     estado: filters.estado || undefined,
+    tipoComprobante: filters.tipoComprobante || undefined,
     soloConStock: filters.soloConStock || undefined,
+    bajoMinimo: filters.soloBajoMinimo || undefined,
+    agruparPor: filters.agruparPor || undefined,
+  }
+}
+
+function salidasPorOsParams(filters: ReporteInventarioFilters, includePagination = true) {
+  return {
+    ...(includePagination ? { page: filters.page, size: filters.size } : {}),
+    fechaDesde: reportDateStart(filters.fechaDesde),
+    fechaHasta: reportDateEnd(filters.fechaHasta),
+    ordenTrabajo: filters.ordenTrabajo?.trim() || undefined,
+    productoId: filters.productoId || undefined,
+    estado: filters.estado || undefined,
   }
 }
 
@@ -73,6 +107,72 @@ async function getPage<T>(endpoint: string, filters: ReporteInventarioFilters) {
     filters.page,
     filters.size,
   )
+}
+
+function normalizeReporte<T extends { registros: PageResponse<unknown> }>(
+  value: T,
+  page: number,
+  size: number,
+) {
+  if (!value?.registros) {
+    return {
+      ...(value ?? {}),
+      registros: emptyPage(page, size),
+    } as T
+  }
+
+  return {
+    ...value,
+    registros: normalizeReportePage(value.registros, page, size),
+  } as T
+}
+
+async function getReporte<T extends { registros: PageResponse<unknown> }>(
+  endpoint: string,
+  filters: ReporteInventarioFilters,
+  options?: { plainDates?: boolean },
+) {
+  const { data } = await apiClient.get(endpoint, {
+    params: reporteParams(filters, options),
+  })
+
+  return normalizeReporte<T>(unwrapApiData<T>(data), filters.page, filters.size)
+}
+
+async function getBlob(endpoint: string, filters?: Partial<ReporteInventarioFilters>) {
+  const { data, headers } = await apiClient.get<Blob>(endpoint, {
+    params: filters
+      ? reporteParams(
+          {
+            page: filters.page ?? 0,
+            size: filters.size ?? 10,
+            ...filters,
+          },
+          { plainDates: true },
+        )
+      : undefined,
+    responseType: 'blob',
+  })
+
+  return {
+    blob: data,
+    filename: headers['content-disposition'] as string | undefined,
+  }
+}
+
+async function getSalidasPorOsBlob(filters: ReporteInventarioFilters) {
+  const { data, headers } = await apiClient.get<Blob>(
+    '/api/reportes/inventario/salidas-por-os/excel',
+    {
+      params: salidasPorOsParams(filters, false),
+      responseType: 'blob',
+    },
+  )
+
+  return {
+    blob: data,
+    filename: headers['content-disposition'] as string | undefined,
+  }
 }
 
 export function getReporteInventarioApiErrorMessage(error: unknown) {
@@ -103,6 +203,10 @@ export function getReporteInventarioApiErrorMessage(error: unknown) {
     }
   }
 
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
   return 'Ocurrio un error inesperado al consultar reportes.'
 }
 
@@ -117,13 +221,26 @@ export const reporteInventarioService = {
   },
 
   getStockValorizado(filters: ReporteInventarioFilters) {
-    return getPage<StockValorizadoItem>('/api/reportes/inventario/stock-valorizado', filters)
+    return getReporte<StockValorizadoReporte>(
+      '/api/reportes/inventario/stock-valorizado',
+      filters,
+      { plainDates: true },
+    )
+  },
+
+  async getKardexValorizado(filters: ReporteInventarioFilters) {
+    const { data } = await apiClient.get('/api/reportes/inventario/kardex-valorizado', {
+      params: reporteParams(filters, { plainDates: true }),
+    })
+
+    return unwrapApiData<KardexValorizadoReporte>(data)
   },
 
   getEntradasProveedor(filters: ReporteInventarioFilters) {
-    return getPage<EntradaProveedorItem>(
+    return getReporte<EntradaProveedorReporte>(
       '/api/reportes/inventario/entradas-proveedor',
       filters,
+      { plainDates: true },
     )
   },
 
@@ -131,10 +248,54 @@ export const reporteInventarioService = {
     return getPage<SalidaInventarioItem>('/api/reportes/inventario/salidas', filters)
   },
 
+  getSalidasDetalle(filters: ReporteInventarioFilters) {
+    return getReporte<SalidaInventarioReporte>(
+      '/api/reportes/inventario/salidas-detalle',
+      filters,
+      { plainDates: true },
+    )
+  },
+
+  async getSalidasPorOs(filters: ReporteInventarioFilters) {
+    const { data } = await apiClient.get('/api/reportes/inventario/salidas-por-os', {
+      params: salidasPorOsParams(filters),
+    })
+
+    return normalizeReporte<SalidaValorizadaOsReporteResponse>(
+      unwrapApiData<SalidaValorizadaOsReporteResponse>(data),
+      filters.page,
+      filters.size,
+    )
+  },
+
   getProductosBajoMinimo(filters: ReporteInventarioFilters) {
     return getPage<ProductoBajoMinimoItem>(
       '/api/reportes/inventario/productos-bajo-minimo',
       filters,
     )
+  },
+
+  exportStockValorizado(filters: ReporteInventarioFilters) {
+    return getBlob('/api/reportes/inventario/stock-valorizado/excel', filters)
+  },
+
+  exportKardexValorizado(filters: ReporteInventarioFilters) {
+    return getBlob('/api/reportes/inventario/kardex-valorizado/excel', filters)
+  },
+
+  exportSalidasDetalle(filters: ReporteInventarioFilters) {
+    return getBlob('/api/reportes/inventario/salidas-detalle/excel', filters)
+  },
+
+  exportSalidasPorOs(filters: ReporteInventarioFilters) {
+    return getSalidasPorOsBlob(filters)
+  },
+
+  exportEntradasProveedor(filters: ReporteInventarioFilters) {
+    return getBlob('/api/reportes/inventario/entradas-proveedor/excel', filters)
+  },
+
+  getMovimientoPdf(movimientoId: number) {
+    return getBlob(`/api/reportes/inventario/movimientos/${movimientoId}/pdf`)
   },
 }

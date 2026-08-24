@@ -81,6 +81,7 @@ export const kardexService = {
       params: {
         page: filters.page,
         size: filters.size,
+        sort: 'fechaMovimiento,id,desc',
         texto: filters.texto || undefined,
         productoId: filters.productoId || undefined,
         almacenId: filters.almacenId || undefined,

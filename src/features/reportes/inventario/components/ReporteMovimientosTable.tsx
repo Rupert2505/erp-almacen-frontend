@@ -1,18 +1,13 @@
+import { MovementNumberBadge } from '../../../../shared/components/MovementNumberBadge'
+import { MovementTypeBadge } from '../../../../shared/components/MovementTypeBadge'
+import { ProductCodeBadge } from '../../../../shared/components/ProductCodeBadge'
 import { formatMovimientoLabel } from '../../../inventario/movimientos/utils/movimientoLabels'
 import type { ReporteMovimientoItem } from '../types/reporteInventario.types'
+import { formatReportDecimal } from '../utils/reportNumberFormat'
 
 type ReporteMovimientosTableProps = {
   rows: ReporteMovimientoItem[]
   isLoading: boolean
-}
-
-const numberFormatter = new Intl.NumberFormat('es-PE', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-})
-
-function formatNumber(value?: number | null) {
-  return value === undefined || value === null ? '-' : numberFormatter.format(value)
 }
 
 function formatDate(value?: string | null) {
@@ -68,12 +63,13 @@ export function ReporteMovimientosTable({ isLoading, rows }: ReporteMovimientosT
               rows.map((row) => (
                 <tr className="hover:bg-cyan-50/40" key={`${row.movimientoId}-${row.productoCodigo}`}>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <span className="font-semibold text-slate-950">{row.numero}</span>
+                    <MovementNumberBadge number={row.numero} />
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                      {formatMovimientoLabel(row.tipoMovimiento)}
-                    </span>
+                    <MovementTypeBadge
+                      label={formatMovimientoLabel(row.tipoMovimiento)}
+                      type={row.tipoMovimiento}
+                    />
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span
@@ -92,9 +88,7 @@ export function ReporteMovimientosTable({ isLoading, rows }: ReporteMovimientosT
                   </td>
                   <td className="min-w-72 px-4 py-3">
                     <div className="space-y-1">
-                      <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                        {row.productoCodigo}
-                      </span>
+                      <ProductCodeBadge code={row.productoCodigo} />
                       <p className="font-medium leading-5 text-slate-950">{row.productoNombre || '-'}</p>
                     </div>
                   </td>
@@ -105,13 +99,13 @@ export function ReporteMovimientosTable({ isLoading, rows }: ReporteMovimientosT
                     {row.almacenDestinoNombre || '-'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
-                    {formatNumber(row.cantidad)}
+                    {formatReportDecimal(row.cantidad)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">
-                    {formatNumber(row.costoUnitario)}
+                    {formatReportDecimal(row.costoUnitario)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">
-                    {formatNumber(row.totalLinea)}
+                    {formatReportDecimal(row.totalLinea)}
                   </td>
                 </tr>
               ))

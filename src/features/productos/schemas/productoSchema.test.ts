@@ -68,4 +68,20 @@ describe('productoSchema', () => {
       ]),
     )
   })
+
+  it('acepta cero y decimales en costoReferencial manteniendo el campo API', () => {
+    expect(productoSchema.parse({ ...baseProducto, costoReferencial: 0 }).costoReferencial).toBe(0)
+    expect(
+      productoSchema.parse({ ...baseProducto, costoReferencial: '12.71' }).costoReferencial,
+    ).toBe(12.71)
+  })
+
+  it('rechaza costoReferencial no numerico y maneja null como ausente', () => {
+    expect(productoSchema.safeParse({ ...baseProducto, costoReferencial: 'abc' }).success).toBe(
+      false,
+    )
+    expect(
+      productoSchema.parse({ ...baseProducto, costoReferencial: null }).costoReferencial,
+    ).toBeUndefined()
+  })
 })

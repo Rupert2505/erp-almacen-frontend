@@ -67,6 +67,7 @@ const productos = [
     tipoArticuloId: 1,
     familiaId: 1,
     unidadMedidaId: 1,
+    costoReferencial: 12.71,
     controlaLote: false,
     controlaSerie: false,
     activo: true,
@@ -137,6 +138,35 @@ function ToggleMovimientoModal({ onSubmit }: { onSubmit: MovimientoFormModalProp
   )
 }
 
+function StockErrorMovimientoModal({
+  onSubmit,
+}: {
+  onSubmit: MovimientoFormModalProps['onSubmit']
+}) {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  return (
+    <MovimientoFormModal
+      almacenes={almacenes}
+      errorMessage={errorMessage}
+      isOpen
+      isSaving={false}
+      onClose={vi.fn()}
+      onSubmit={async (values, options) => {
+        try {
+          await onSubmit(values, options)
+        } catch (error) {
+          setErrorMessage('Stock insuficiente para el producto P-001. Disponible: 0, solicitado: 1.')
+          throw error
+        }
+      }}
+      productos={productos}
+      proveedores={proveedores}
+      ubicaciones={ubicaciones}
+    />
+  )
+}
+
 async function selectProveedorAndProducto() {
   const user = userEvent.setup()
 
@@ -154,13 +184,14 @@ async function fillEntradaCompraBasica() {
 
   await user.selectOptions(screen.getByLabelText('Almacen destino'), '1')
   await user.type(screen.getByLabelText('Fecha recepcion'), '2026-06-11')
-  await user.type(screen.getByLabelText('Costo unitario linea 1'), '12.345678')
+  await user.type(screen.getByLabelText('Costo de compra unitario sin IGV linea 1'), '12.345678')
 
   return user
 }
 
 describe('MovimientoFormModal', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(productoService.getProductos).mockResolvedValue({
       content: productos,
       totalElements: 1,
@@ -194,6 +225,109 @@ describe('MovimientoFormModal', () => {
     expect(screen.getByText('Comprobante de compra')).toBeInTheDocument()
     expect(screen.getByText('Orden y recepcion')).toBeInTheDocument()
     expect(screen.getByText('Costos adicionales')).toBeInTheDocument()
+    expect(screen.getByText('Costo de compra unitario sin IGV')).toBeInTheDocument()
+    expect(screen.getByLabelText('Tasa IGV linea 1')).toHaveValue(18)
+    expect(screen.getByLabelText('Tasa IGV linea 1')).toBeInTheDocument()
+    expect(screen.getByLabelText('IGV recuperable linea 1')).toBeChecked()
+  })
+
+  it('permite comprimir secciones y conserva los datos ingresados', async () => {
+    renderModal()
+    const user = userEvent.setup()
+
+    expect(screen.getByRole('heading', { level: 4, name: 'Guia de remision' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 4, name: 'Comprobante de compra' }),
+    ).toBeInTheDocument()
+
+    const serieGuia = screen.getByLabelText('Serie guia (opcional)')
+    await user.type(serieGuia, 'T001')
+    await user.click(
+      screen.getByRole('button', { name: 'Comprimir Documentos de compra y recepcion' }),
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'Desplegar Documentos de compra y recepcion' }),
+    ).toHaveAttribute('aria-expanded', 'false')
+    expect(document.querySelector('#movimiento-documentos-compra')).toHaveAttribute('hidden')
+    expect(
+      screen.queryByRole('button', { name: /Guia de remision/ }),
+    ).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', { name: 'Desplegar Documentos de compra y recepcion' }),
+    )
+
+    expect(screen.getByLabelText('Serie guia (opcional)')).toHaveValue('T001')
+  })
+
+  it('reabre las secciones comprimidas cuando existen errores de validacion', async () => {
+    renderModal()
+    const user = userEvent.setup()
+
+    await user.click(
+      screen.getByRole('button', { name: 'Comprimir Documentos de compra y recepcion' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Comprimir Detalles' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar borrador' }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Comprimir Documentos de compra y recepcion' }),
+      ).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('button', { name: 'Comprimir Detalles' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+    })
+  })
+
+  it('prioriza el espacio del producto y mantiene compactos los campos secundarios', () => {
+    renderModal()
+
+    expect(screen.getByRole('columnheader', { name: 'Producto' })).toHaveClass(
+      'w-[28rem]',
+      'min-w-[28rem]',
+    )
+    expect(screen.getByLabelText('Producto linea 1').closest('td')).toHaveClass(
+      'w-[28rem]',
+      'min-w-[28rem]',
+    )
+    expect(screen.getByLabelText('Cantidad linea 1').closest('td')).toHaveClass(
+      'w-28',
+      'min-w-28',
+    )
+  })
+
+  it('selecciona el valor completo de cantidad al recibir el foco', async () => {
+    renderModal()
+    const user = userEvent.setup()
+    const cantidad = screen.getByLabelText('Cantidad linea 1') as HTMLInputElement
+    const selectSpy = vi.spyOn(cantidad, 'select')
+
+    await user.click(cantidad)
+
+    expect(selectSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('previsualiza compra sin reinterpretar el costo sin IGV digitado', async () => {
+    renderModal()
+    const user = userEvent.setup()
+
+    await user.clear(screen.getByLabelText('Cantidad linea 1'))
+    await user.type(screen.getByLabelText('Cantidad linea 1'), '10')
+    await user.type(screen.getByLabelText('Costo de compra unitario sin IGV linea 1'), '100')
+
+    expect(screen.getByText('IGV unitario:')).toBeInTheDocument()
+    expect(screen.getByText('S/ 18.00')).toBeInTheDocument()
+    expect(screen.getByText('S/ 118.00')).toBeInTheDocument()
+    expect(screen.getAllByText('S/ 100.00')).not.toHaveLength(0)
+    expect(screen.getAllByText('S/ 1,000.00')).not.toHaveLength(0)
+
+    await user.click(screen.getByLabelText('IGV recuperable linea 1'))
+
+    expect(screen.getByDisplayValue('100')).toBeInTheDocument()
+    expect(screen.getAllByText('S/ 1,180.00')).not.toHaveLength(0)
   })
 
   it('muestra tipo comprobante como select con valores productivos', async () => {
@@ -226,7 +360,14 @@ describe('MovimientoFormModal', () => {
         expect.objectContaining({
           proveedorId: 10,
           almacenDestinoId: 1,
-          detalles: expect.arrayContaining([expect.objectContaining({ productoId: 20 })]),
+          detalles: expect.arrayContaining([
+            expect.objectContaining({
+              igvRecuperable: true,
+              productoId: 20,
+              tasaIgv: 18,
+              valorUnitarioSinIgv: 12.345678,
+            }),
+          ]),
         }),
         { confirmar: false },
       )
@@ -314,6 +455,205 @@ describe('MovimientoFormModal', () => {
     expect(screen.getByLabelText('Area solicitante (opcional)')).toBeInTheDocument()
     expect(screen.getByLabelText('Solicitante (opcional)')).toBeInTheDocument()
     expect(screen.queryByLabelText('Almacen destino')).not.toBeInTheDocument()
+    expect(screen.queryByText('Valorizacion comercial')).not.toBeInTheDocument()
+  })
+
+  it('SALIDA_VENTA muestra OS y opciones de recargo comercial', async () => {
+    renderModal()
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
+
+    expect(screen.getByLabelText('Orden de Servicio (OS)')).toHaveAttribute(
+      'placeholder',
+      'Ej. OS-002541',
+    )
+    expect(screen.getByText('Valorizacion comercial')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '25%' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '35%' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '50%' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '100%' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Personalizado' })).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Previsualización informativa. Los importes definitivos se calcularán y registrarán al confirmar el movimiento.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/backend/i)).not.toBeInTheDocument()
+  })
+
+  it('SALIDA_VENTA calcula preview por cantidad y envia recargo al confirmar', async () => {
+    const onSubmit = renderModal()
+    const user = userEvent.setup()
+    vi.mocked(stockService.getStock).mockResolvedValue({
+      content: [
+        {
+          id: 50,
+          productoId: 20,
+          productoCodigo: 'P-001',
+          productoNombre: 'Producto prueba',
+          almacenId: 1,
+          almacenCodigo: 'ALM-01',
+          almacenNombre: 'Principal',
+          ubicacionId: 30,
+          ubicacionCodigo: 'UB-01',
+          ubicacionNombre: 'Recepcion',
+          cantidadActual: 25,
+          costoPromedio: 10,
+        },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 10,
+    })
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
+    await user.type(screen.getByLabelText('Orden de Servicio (OS)'), 'OS-TEST-001')
+    await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
+    await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
+    await user.click(await screen.findByText('P-001 - Producto prueba'))
+    await user.selectOptions(screen.getByLabelText('Recargo comercial linea 1'), '35')
+    await user.clear(screen.getByLabelText('Cantidad linea 1'))
+    await user.type(screen.getByLabelText('Cantidad linea 1'), '2')
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/S\/ 17\.16/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/S\/ 3\.09/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/S\/ 20\.25/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/S\/ 34\.32/).length).toBeGreaterThan(0)
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Guardar y confirmar' }))
+    await user.click(await screen.findByRole('button', { name: 'Si, guardar y confirmar' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          confirmar: true,
+          ordenTrabajo: 'OS-TEST-001',
+          tipoMovimiento: 'SALIDA_VENTA',
+          detalles: [
+            expect.objectContaining({
+              costoBaseComercialSinIgv: 12.71,
+              recargoComercialPct: 35,
+            }),
+          ],
+        }),
+        { confirmar: true },
+      )
+    })
+  })
+
+  it('cierra la confirmacion y muestra el error sin perder los datos del formulario', async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error('Stock insuficiente'))
+    render(<StockErrorMovimientoModal onSubmit={onSubmit} />)
+    const user = await fillEntradaCompraBasica()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar y confirmar' }))
+    await user.click(screen.getByRole('button', { name: 'Si, guardar y confirmar' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Stock insuficiente para el producto P-001. Disponible: 0, solicitado: 1.',
+    )
+    expect(screen.queryByText(/Esta accion guardara y confirmara el movimiento/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Nuevo movimiento' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Almacen destino')).toHaveValue('1')
+    expect(screen.getByLabelText('Fecha recepcion')).toHaveValue('2026-06-11')
+    expect(screen.getByLabelText('Costo de compra unitario sin IGV linea 1')).toHaveValue(12.345678)
+    expect(onSubmit).toHaveBeenCalledWith(expect.any(Object), { confirmar: true })
+  })
+
+  it('SALIDA_VENTA bloquea confirmacion con OS vacia', async () => {
+    renderModal()
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
+    await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
+    await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
+    await user.click(await screen.findByText('P-001 - Producto prueba'))
+    await user.selectOptions(screen.getByLabelText('Recargo comercial linea 1'), '35')
+    await user.click(screen.getByRole('button', { name: 'Guardar y confirmar' }))
+
+    expect(await screen.findByText('Ingrese la Orden de Servicio (OS)')).toBeInTheDocument()
+    expect(screen.queryByText(/Esta accion guardara y confirmara/i)).not.toBeInTheDocument()
+  })
+
+  it('SALIDA_VENTA bloquea el borrador con OS vacia', async () => {
+    const onSubmit = renderModal()
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
+    await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
+    await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
+    await user.click(await screen.findByText('P-001 - Producto prueba'))
+    await user.click(screen.getByRole('button', { name: 'Guardar borrador' }))
+
+    expect(await screen.findByText('Ingrese la Orden de Servicio (OS)')).toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('SALIDA_VENTA permite recargo personalizado y rechaza mayor a 1000%', async () => {
+    renderModal()
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
+    await user.type(screen.getByLabelText('Orden de Servicio (OS)'), 'OS-1000')
+    await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
+    await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
+    await user.click(await screen.findByText('P-001 - Producto prueba'))
+    await user.selectOptions(screen.getByLabelText('Recargo comercial linea 1'), 'CUSTOM')
+
+    const personalizado = screen.getByLabelText('Recargo personalizado (%) linea 1')
+    await user.type(personalizado, '1000.01')
+    await user.click(screen.getByRole('button', { name: 'Guardar y confirmar' }))
+
+    expect(
+      await screen.findByText('El recargo comercial no puede superar 1000%'),
+    ).toBeInTheDocument()
+  })
+
+  it('SALIDA_VENTA advierte costo base faltante pero permite guardar borrador', async () => {
+    const onSubmit = renderModal()
+    const user = userEvent.setup()
+    vi.mocked(productoService.getProductos).mockResolvedValue({
+      content: [{ ...productos[0], costoReferencial: null }],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 10,
+    })
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
+    await user.type(screen.getByLabelText('Orden de Servicio (OS)'), 'OS-BORRADOR')
+    await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
+    await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
+    await user.click(await screen.findByText('P-001 - Producto prueba'))
+
+    expect(
+      screen.getByText('Este producto no tiene configurado un costo base comercial sin IGV.'),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar borrador' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.any(Object), { confirmar: false }))
+  })
+
+  it('una nueva SALIDA_VENTA usa el costoReferencial vigente del producto', async () => {
+    renderModal()
+    const user = userEvent.setup()
+    vi.mocked(productoService.getProductos).mockResolvedValue({
+      content: [{ ...productos[0], costoReferencial: 18 }],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 10,
+    })
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
+    await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
+    await user.click(await screen.findByText('P-001 - Producto prueba'))
+
+    expect(screen.getAllByText(/S\/ 18\.00/).length).toBeGreaterThan(0)
   })
 
   it('SALIDA_VENTA no carga costo sin almacen origen', async () => {
@@ -366,6 +706,7 @@ describe('MovimientoFormModal', () => {
     })
 
     await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
+    await user.type(screen.getByLabelText('Orden de Servicio (OS)'), 'OS-BORRADOR')
     await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
     await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
     await user.click(await screen.findByText('P-001 - Producto prueba'))
@@ -382,8 +723,8 @@ describe('MovimientoFormModal', () => {
       )
       expect(costoInput).toHaveValue(99.123456)
     })
-    expect(screen.getByDisplayValue('UB-01 - Recepcion')).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'UB-02 - Otra ubicacion' })).not.toBeInTheDocument()
+    expect(screen.getByDisplayValue('ALM-01 - UB-01')).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'ALM-02 - UB-02' })).not.toBeInTheDocument()
     expect(screen.getByText('Stock disponible: 25')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Guardar borrador' }))
@@ -536,35 +877,35 @@ describe('MovimientoFormModal', () => {
     expect(screen.getByLabelText('Observacion')).toBeInTheDocument()
   })
 
-  it('cambiar tipo limpia campos que no aplican', async () => {
-    const onSubmit = renderModal()
+  it('cambiar tipo reinicia todos los datos aunque los campos coincidan', async () => {
+    renderModal()
     const user = userEvent.setup()
 
+    await user.type(screen.getByPlaceholderText('Buscar proveedor'), 'Acme')
+    await user.click(await screen.findByText('20123456789 - Proveedor Acme'))
+    await user.selectOptions(screen.getByLabelText('Almacen destino'), '1')
+    await user.type(screen.getByLabelText('Observacion general (opcional)'), 'Dato sensible')
     await user.type(screen.getByLabelText('Serie guia (opcional)'), 'T001')
     await user.type(screen.getByLabelText('Numero guia (opcional)'), '123')
     await user.type(screen.getByLabelText('Fecha recepcion'), '2026-06-11')
-    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_CONSUMO')
-
-    expect(screen.queryByLabelText('Serie guia (opcional)')).not.toBeInTheDocument()
-
-    await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
-    await user.type(screen.getByLabelText('Motivo movimiento'), 'Consumo interno')
-    await user.type(screen.getByLabelText('Observacion'), 'Salida para operacion')
     await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
     await user.click(await screen.findByText('P-001 - Producto prueba'))
-    await user.click(screen.getByRole('button', { name: 'Guardar borrador' }))
+    await user.clear(screen.getByLabelText('Cantidad linea 1'))
+    await user.type(screen.getByLabelText('Cantidad linea 1'), '123456')
+    await user.click(screen.getByRole('button', { name: 'Agregar linea' }))
 
-    await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          guiaSerie: '',
-          guiaNumero: '',
-          fechaRecepcion: '',
-          tipoMovimiento: 'SALIDA_CONSUMO',
-        }),
-        { confirmar: false },
-      )
-    })
+    expect(screen.getByText('Lineas:').parentElement).toHaveTextContent('Lineas: 2')
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'ENTRADA_AJUSTE')
+
+    expect(screen.getByLabelText('Tipo movimiento')).toHaveValue('ENTRADA_AJUSTE')
+    expect(screen.getByLabelText('Proveedor')).toHaveValue('')
+    expect(screen.getByLabelText('Almacen destino')).toHaveValue('')
+    expect(screen.getByLabelText('Observacion')).toHaveValue('')
+    expect(screen.getByPlaceholderText('Buscar producto')).toHaveValue('')
+    expect(screen.getByLabelText('Cantidad linea 1')).toHaveValue(1)
+    expect(screen.getByText('Lineas:').parentElement).toHaveTextContent('Lineas: 1')
+    expect(screen.queryByLabelText('Serie guia (opcional)')).not.toBeInTheDocument()
   })
 
   it('valida obligatorios por tipo', async () => {
@@ -609,6 +950,94 @@ describe('MovimientoFormModal', () => {
         expect.objectContaining({ size: 10, texto: 'Producto' }),
       )
     })
+  })
+
+  it('refresca las opciones del producto con el ultimo texto digitado', async () => {
+    vi.mocked(productoService.getProductos).mockImplementation(async (filters) => {
+      const texto = filters.texto?.toUpperCase()
+      const content =
+        texto === 'LIJA'
+          ? [{ ...productos[0], id: 22, codigo: 'LIJA-001', nombre: 'Lija al agua' }]
+          : texto === 'LIJ'
+            ? [{ ...productos[0], id: 21, codigo: 'LIJ-001', nombre: 'Resultado parcial' }]
+            : []
+
+      return {
+        content,
+        totalElements: content.length,
+        totalPages: content.length ? 1 : 0,
+        number: 0,
+        size: 10,
+      }
+    })
+
+    renderModal()
+    const user = userEvent.setup()
+    const input = screen.getByPlaceholderText('Buscar producto')
+
+    await user.type(input, 'LIJ')
+    expect(await screen.findByText('LIJ-001 - Resultado parcial')).toBeInTheDocument()
+
+    await user.type(input, 'A')
+    expect(await screen.findByText('LIJA-001 - Lija al agua')).toBeInTheDocument()
+    expect(screen.queryByText('LIJ-001 - Resultado parcial')).not.toBeInTheDocument()
+
+    await waitFor(() => {
+      const textosBuscados = vi
+        .mocked(productoService.getProductos)
+        .mock.calls.map(([filters]) => filters.texto)
+
+      expect(textosBuscados.slice(-4)).toEqual(['L', 'LI', 'LIJ', 'LIJA'])
+    })
+  })
+
+  it('filtra inmediatamente los productos precargados por nombre y codigo', async () => {
+    const productoManguera = {
+      ...productos[0],
+      id: 21,
+      codigo: 'HRM-3084',
+      nombre: 'Manguera de mezcla',
+    }
+    const productoPegamento = {
+      ...productos[0],
+      id: 22,
+      codigo: 'QUI-1034',
+      nombre: 'Africano pegamento',
+    }
+    const pendingSearch = new Promise<{
+      content: typeof productos
+      totalElements: number
+      totalPages: number
+      number: number
+      size: number
+    }>(() => undefined)
+
+    vi.mocked(productoService.getProductos).mockImplementation(() => pendingSearch)
+
+    render(
+      <MovimientoFormModal
+        almacenes={almacenes}
+        isOpen
+        isSaving={false}
+        onClose={vi.fn()}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        productos={[productoManguera, productoPegamento]}
+        proveedores={proveedores}
+        ubicaciones={ubicaciones}
+      />,
+    )
+
+    const user = userEvent.setup()
+    const input = screen.getByPlaceholderText('Buscar producto')
+
+    await user.type(input, 'PEGAMENTO')
+    expect(screen.getByText('QUI-1034 - Africano pegamento')).toBeInTheDocument()
+    expect(screen.queryByText('HRM-3084 - Manguera de mezcla')).not.toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, 'QUI-1034')
+    expect(screen.getByText('QUI-1034 - Africano pegamento')).toBeInTheDocument()
+    expect(screen.queryByText('HRM-3084 - Manguera de mezcla')).not.toBeInTheDocument()
   })
 
   it('al escribir filtra proveedor y producto sin mantener opciones precargadas arriba', async () => {

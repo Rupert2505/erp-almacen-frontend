@@ -2,7 +2,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
+import { PermissionRoute } from '../../app/router/PermissionRoute'
 import { ProtectedRoute } from '../../app/router/ProtectedRoute'
+import { routeAccess } from '../../app/router/routeAccess'
 import { Header } from '../../layout/Header'
 import { Sidebar } from '../../layout/Sidebar'
 import { AUTH_ACCESS_TOKEN_KEY, AUTH_USER_KEY } from '../../shared/utils/storageKeys'
@@ -21,6 +23,23 @@ const adminUser = {
   email: 'admin@example.com',
   roles: ['ADMIN'],
   permisos: ['PRODUCTO_VER'],
+}
+
+const consultaUser = {
+  username: 'consulta',
+  nombres: 'Consulta',
+  apellidos: 'Solo Lectura',
+  email: 'consulta@example.com',
+  roles: ['CONSULTA'],
+  permisos: [
+    'ALMACEN_VER',
+    'INVENTARIO_DEVOLUCION_VER',
+    'KARDEX_VER',
+    'PRODUCTO_VER',
+    'PROVEEDOR_VER',
+    'REPORTE_VER',
+    'STOCK_VER',
+  ],
 }
 
 function renderWithAuth(
@@ -105,6 +124,58 @@ describe('auth, rutas protegidas y layout', () => {
     expect(screen.getByText('Privado')).toBeInTheDocument()
   })
 
+  it('PermissionRoute bloquea una ruta sin permisos suficientes', () => {
+    renderWithAuth(
+      { isAuthenticated: true, status: 'authenticated', user: consultaUser },
+      ['/inventario/entradas/121/devolucion'],
+      <Routes>
+        <Route
+          path="/inventario/entradas/:entradaId/devolucion"
+          element={
+            <PermissionRoute access={routeAccess.devolucionProveedor}>
+              <div>Formulario de devolucion</div>
+            </PermissionRoute>
+          }
+        />
+        <Route path="/403" element={<div>Acceso no autorizado</div>} />
+      </Routes>,
+    )
+
+    expect(screen.getByText('Acceso no autorizado')).toBeInTheDocument()
+    expect(screen.queryByText('Formulario de devolucion')).not.toBeInTheDocument()
+  })
+
+  it('PermissionRoute permite una ruta con todos los permisos requeridos', () => {
+    renderWithAuth(
+      {
+        isAuthenticated: true,
+        status: 'authenticated',
+        user: {
+          ...consultaUser,
+          permisos: [
+            ...consultaUser.permisos,
+            'INVENTARIO_DEVOLUCION_CREAR',
+          ],
+        },
+      },
+      ['/inventario/entradas/121/devolucion'],
+      <Routes>
+        <Route
+          path="/inventario/entradas/:entradaId/devolucion"
+          element={
+            <PermissionRoute access={routeAccess.devolucionProveedor}>
+              <div>Formulario de devolucion</div>
+            </PermissionRoute>
+          }
+        />
+        <Route path="/403" element={<div>Acceso no autorizado</div>} />
+      </Routes>,
+    )
+
+    expect(screen.getByText('Formulario de devolucion')).toBeInTheDocument()
+    expect(screen.queryByText('Acceso no autorizado')).not.toBeInTheDocument()
+  })
+
   it('Header muestra usuario y ejecuta logout', async () => {
     const logout = vi.fn()
     const user = userEvent.setup()
@@ -133,7 +204,8 @@ describe('auth, rutas protegidas y layout', () => {
       />,
     )
 
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Reporte de inventario' })).toBeInTheDocument()
     expect(screen.getByText('Productos')).toBeInTheDocument()
     expect(screen.getByText('Movimientos')).toBeInTheDocument()
     expect(screen.getByText('Usuarios')).toBeInTheDocument()

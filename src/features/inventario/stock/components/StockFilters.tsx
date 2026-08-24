@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react'
 import type { Almacen } from '../../../almacenes/types/almacen.types'
 import type { Ubicacion } from '../../../almacenes/types/ubicacion.types'
+import { formatUbicacionLabel } from '../../../almacenes/utils/ubicacionLabels'
 import type { Producto } from '../../../productos/types/producto.types'
 
 type StockFiltersProps = {
@@ -96,7 +97,7 @@ export function StockFilters({
           <option value="">Todas</option>
           {ubicacionesFiltradas.map((ubicacion) => (
             <option key={ubicacion.id} value={ubicacion.id}>
-              {ubicacion.codigo} - {ubicacion.nombre}
+              {formatUbicacionLabel(ubicacion)}
             </option>
           ))}
         </select>

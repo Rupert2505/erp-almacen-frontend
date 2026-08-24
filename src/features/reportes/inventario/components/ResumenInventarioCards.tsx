@@ -10,6 +10,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import type { ReporteInventarioResumen } from '../types/reporteInventario.types'
+import { formatReportCount, formatReportDecimal } from '../utils/reportNumberFormat'
 
 type ResumenInventarioCardsProps = {
   resumen?: ReporteInventarioResumen
@@ -21,16 +22,16 @@ const currencyFormatter = new Intl.NumberFormat('es-PE', {
   maximumFractionDigits: 2,
 })
 
-const numberFormatter = new Intl.NumberFormat('es-PE', {
-  maximumFractionDigits: 4,
-})
-
-function formatValue(value?: number, currency = false) {
+function formatValue(value?: number, currency = false, decimal = false) {
   if (value === undefined || value === null) {
     return isNaN(Number(value)) ? '-' : '0'
   }
 
-  return currency ? currencyFormatter.format(value) : numberFormatter.format(value)
+  if (currency) {
+    return currencyFormatter.format(value)
+  }
+
+  return decimal ? formatReportDecimal(value) : formatReportCount(value)
 }
 
 export function ResumenInventarioCards({ isLoading, resumen }: ResumenInventarioCardsProps) {
@@ -82,6 +83,7 @@ export function ResumenInventarioCards({ isLoading, resumen }: ResumenInventario
       value: resumen?.totalStockActual,
       icon: Boxes,
       tone: 'bg-cyan-50 text-cyan-700',
+      decimal: true,
     },
     {
       label: 'Productos bajo minimo',
@@ -117,7 +119,7 @@ export function ResumenInventarioCards({ isLoading, resumen }: ResumenInventario
               </span>
             </div>
             <p className="mt-4 text-2xl font-semibold text-slate-950">
-              {isLoading ? '...' : formatValue(card.value, card.currency)}
+              {isLoading ? '...' : formatValue(card.value, card.currency, card.decimal)}
             </p>
           </div>
         )

@@ -1,3 +1,7 @@
+import { MovementNumberBadge } from '../../../../shared/components/MovementNumberBadge'
+import { MovementTypeBadge } from '../../../../shared/components/MovementTypeBadge'
+import { ProductCodeBadge } from '../../../../shared/components/ProductCodeBadge'
+import { formatOptionalCurrency } from '../../../../shared/utils/numberFormat'
 import { formatMovimientoLabel } from '../../movimientos/utils/movimientoLabels'
 import type { KardexItem } from '../types/kardex.types'
 
@@ -10,11 +14,6 @@ const numberFormatter = new Intl.NumberFormat('es-PE', {
   maximumFractionDigits: 4,
 })
 
-const moneyFormatter = new Intl.NumberFormat('es-PE', {
-  currency: 'PEN',
-  style: 'currency',
-})
-
 function formatDate(value?: string | null) {
   if (!value) {
     return '-'
@@ -24,10 +23,6 @@ function formatDate(value?: string | null) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value))
-}
-
-function money(value?: number | null) {
-  return value === null || value === undefined ? '-' : moneyFormatter.format(value)
 }
 
 export function KardexTable({ isLoading, rows }: KardexTableProps) {
@@ -75,26 +70,25 @@ export function KardexTable({ isLoading, rows }: KardexTableProps) {
                       {formatDate(row.fechaMovimiento)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <span className="font-semibold text-slate-950">{row.numeroMovimiento}</span>
+                      <MovementNumberBadge number={row.numeroMovimiento} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                        {formatMovimientoLabel(row.tipoMovimiento)}
-                      </span>
+                      <MovementTypeBadge
+                        label={formatMovimientoLabel(row.tipoMovimiento)}
+                        type={row.tipoMovimiento}
+                      />
                     </td>
                     <td className="min-w-72 px-4 py-3">
                       <div className="space-y-1">
-                        <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                          {row.productoCodigo}
-                        </span>
+                        <ProductCodeBadge code={row.productoCodigo} />
                         <p className="font-medium leading-5 text-slate-950">{row.productoNombre}</p>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {row.almacenCodigo} - {row.almacenNombre}
+                      {row.almacenNombre || row.almacenCodigo || '-'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {row.ubicacionCodigo ? `${row.ubicacionCodigo} - ${row.ubicacionNombre ?? ''}` : '-'}
+                      {row.ubicacionNombre || row.ubicacionCodigo || '-'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-emerald-700">
                       {row.entrada > 0 ? numberFormatter.format(row.entrada) : '-'}
@@ -109,10 +103,10 @@ export function KardexTable({ isLoading, rows }: KardexTableProps) {
                       {numberFormatter.format(row.saldoFinal)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-600">
-                      {money(row.costoUnitario)}
+                      {formatOptionalCurrency(row.costoUnitario)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-600">
-                      {money(row.costoPromedio)}
+                      {formatOptionalCurrency(row.costoPromedio)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.username ?? '-'}</td>
                     <td className="min-w-56 px-4 py-3 text-slate-600">{row.observacion ?? '-'}</td>
