@@ -91,6 +91,7 @@ export type StockValorizadoResumen = {
   cantidadUnidades: number
   valorTotalInventario: number | null
   productosBajoMinimo: number
+  productosSinStockActivos: number
 }
 
 export type StockValorizadoReporte = {
@@ -165,10 +166,12 @@ export type EntradaProveedorItem = {
   comprobanteNumero?: string | null
   comprobanteFecha?: string | null
   almacenDestino?: string | null
+  almacenDestinoCodigo?: string | null
   productoId?: number | null
   codigoProducto?: string | null
   nombreProducto?: string | null
   unidadMedida?: string | null
+  unidadMedidaAbreviatura?: string | null
   cantidad?: number | null
   costoUnitario?: number | null
   valorLinea?: number | null
@@ -200,12 +203,14 @@ export type SalidaInventarioItem = {
   tipoMovimiento: TipoMovimiento
   estado?: EstadoMovimiento | null
   almacenOrigen?: string | null
+  almacenOrigenCodigo?: string | null
   ubicacionOrigen?: string | null
   productoId?: number | null
   codigoProducto?: string | null
   nombreProducto?: string | null
   familia?: string | null
   unidadMedida?: string | null
+  unidadMedidaAbreviatura?: string | null
   cantidad?: number | null
   costoPromedioAplicado?: number | null
   valorSalida?: number | null
@@ -281,6 +286,7 @@ export type ProductoBajoMinimoItem = {
   categoriaNombre?: string | null
   almacenId?: number | null
   almacenNombre?: string | null
+  almacenCodigo?: string | null
   cantidadActual?: number | null
   stockMinimo?: number | null
   diferencia?: number | null

@@ -24,7 +24,15 @@ export const routeAccess = {
   stock: { allOf: ['STOCK_VER'] },
   kardex: { allOf: ['KARDEX_VER'] },
   usuarios: { allOf: ['USUARIO_ADMIN'] },
-  personal: { allOf: ['USUARIO_ADMIN'] },
+  personal: {
+    anyOf: [
+      'PERSONAL_VER',
+      'PERSONAL_CREAR',
+      'PERSONAL_EDITAR',
+      'PERSONAL_DESACTIVAR',
+      'USUARIO_ADMIN',
+    ],
+  },
 } satisfies Record<string, RouteAccess>
 
 export const authorizedHomeCandidates = [

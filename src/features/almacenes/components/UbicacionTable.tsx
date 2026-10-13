@@ -3,21 +3,23 @@ import type { Ubicacion } from '../types/ubicacion.types'
 
 type UbicacionTableProps = {
   ubicaciones: Ubicacion[]
-  canManage: boolean
+  canEdit: boolean
+  canToggle: boolean
   isLoading: boolean
-  toggleLoadingId?: number | null
+  actionLoadingId?: number | null
   onActivar: (ubicacion: Ubicacion) => void
   onDesactivar: (ubicacion: Ubicacion) => void
   onEdit: (ubicacion: Ubicacion) => void
 }
 
 export function UbicacionTable({
-  canManage,
+  actionLoadingId,
+  canEdit,
+  canToggle,
   isLoading,
   onActivar,
   onDesactivar,
   onEdit,
-  toggleLoadingId,
   ubicaciones,
 }: UbicacionTableProps) {
   return (
@@ -53,7 +55,7 @@ export function UbicacionTable({
 
             {!isLoading
               ? ubicaciones.map((ubicacion) => {
-                  const isToggleLoading = toggleLoadingId === ubicacion.id
+                  const isActionLoading = actionLoadingId === ubicacion.id
 
                   return (
                     <tr className="hover:bg-cyan-50/40" key={ubicacion.id}>
@@ -82,9 +84,10 @@ export function UbicacionTable({
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex justify-end gap-2">
-                          {canManage ? (
+                          {canEdit ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
+                              disabled={isActionLoading}
                               onClick={() => onEdit(ubicacion)}
                               type="button"
                             >
@@ -93,10 +96,10 @@ export function UbicacionTable({
                             </button>
                           ) : null}
 
-                          {canManage && ubicacion.activo ? (
+                          {canToggle && ubicacion.activo ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
-                              disabled={isToggleLoading}
+                              disabled={isActionLoading}
                               onClick={() => onDesactivar(ubicacion)}
                               type="button"
                             >
@@ -105,10 +108,10 @@ export function UbicacionTable({
                             </button>
                           ) : null}
 
-                          {canManage && !ubicacion.activo ? (
+                          {canToggle && !ubicacion.activo ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-200 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                              disabled={isToggleLoading}
+                              disabled={isActionLoading}
                               onClick={() => onActivar(ubicacion)}
                               type="button"
                             >

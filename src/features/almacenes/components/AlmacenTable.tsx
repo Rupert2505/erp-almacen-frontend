@@ -3,9 +3,10 @@ import type { Almacen } from '../types/almacen.types'
 
 type AlmacenTableProps = {
   almacenes: Almacen[]
-  canManage: boolean
+  canEdit: boolean
+  canToggle: boolean
   isLoading: boolean
-  toggleLoadingId?: number | null
+  actionLoadingId?: number | null
   onActivar: (almacen: Almacen) => void
   onDesactivar: (almacen: Almacen) => void
   onEdit: (almacen: Almacen) => void
@@ -13,14 +14,15 @@ type AlmacenTableProps = {
 }
 
 export function AlmacenTable({
+  actionLoadingId,
   almacenes,
-  canManage,
+  canEdit,
+  canToggle,
   isLoading,
   onActivar,
   onDesactivar,
   onEdit,
   onVerUbicaciones,
-  toggleLoadingId,
 }: AlmacenTableProps) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -55,7 +57,7 @@ export function AlmacenTable({
 
             {!isLoading
               ? almacenes.map((almacen) => {
-                  const isToggleLoading = toggleLoadingId === almacen.id
+                  const isActionLoading = actionLoadingId === almacen.id
 
                   return (
                     <tr className="hover:bg-cyan-50/40" key={almacen.id}>
@@ -91,9 +93,10 @@ export function AlmacenTable({
                             Ubicaciones
                           </button>
 
-                          {canManage ? (
+                          {canEdit ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
+                              disabled={isActionLoading}
                               onClick={() => onEdit(almacen)}
                               type="button"
                             >
@@ -102,10 +105,10 @@ export function AlmacenTable({
                             </button>
                           ) : null}
 
-                          {canManage && almacen.activo ? (
+                          {canToggle && almacen.activo ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
-                              disabled={isToggleLoading}
+                              disabled={isActionLoading}
                               onClick={() => onDesactivar(almacen)}
                               type="button"
                             >
@@ -114,10 +117,10 @@ export function AlmacenTable({
                             </button>
                           ) : null}
 
-                          {canManage && !almacen.activo ? (
+                          {canToggle && !almacen.activo ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-200 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                              disabled={isToggleLoading}
+                              disabled={isActionLoading}
                               onClick={() => onActivar(almacen)}
                               type="button"
                             >

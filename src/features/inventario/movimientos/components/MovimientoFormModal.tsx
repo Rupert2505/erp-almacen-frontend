@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
@@ -7,10 +8,20 @@ import { formatOptionalCurrency } from '../../../../shared/utils/numberFormat'
 import type { Almacen } from '../../../almacenes/types/almacen.types'
 import type { Ubicacion } from '../../../almacenes/types/ubicacion.types'
 import { formatUbicacionLabel } from '../../../almacenes/utils/ubicacionLabels'
+import { PersonalFormModal } from '../../../personal/components/PersonalFormModal'
+import type { PersonalFormValues } from '../../../personal/schemas/personalSchema'
+import { getPersonalApiErrorMessage, personalService } from '../../../personal/services/personalService'
+import type { Personal, PersonalPayload } from '../../../personal/types/personal.types'
 import { productoService } from '../../../productos/services/productoService'
 import type { Producto } from '../../../productos/types/producto.types'
 import { proveedorService } from '../../../proveedores/services/proveedorService'
 import type { Proveedor } from '../../../proveedores/types/proveedor.types'
+import {
+  normalizeBusinessText,
+  normalizeOptionalBusinessText,
+  normalizeOptionalEmail,
+  normalizePhone,
+} from '../../../../shared/utils/textNormalization'
 import { stockService } from '../../stock/services/stockService'
 import type { StockItem } from '../../stock/types/stock.types'
 import {
@@ -37,6 +48,7 @@ type MovimientoFormModalProps = {
   ubicaciones: Ubicacion[]
   onClose: () => void
   onSubmit: (values: MovimientoFormValues, options?: { confirmar: boolean }) => Promise<void>
+  personal: Personal[]
 }
 
 type StockLineaState = {
@@ -66,6 +78,9 @@ const textareaClass =
   'min-h-20 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100'
 
 const labelClass = 'mb-2 block text-sm font-medium text-slate-700'
+
+const quickCatalogButtonClass =
+  'grid h-10 w-10 shrink-0 place-items-center rounded-md border border-cyan-300 bg-cyan-50 text-cyan-700 shadow-sm transition-colors hover:border-cyan-400 hover:bg-cyan-100 hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none'
 
 const currencyFormatter = new Intl.NumberFormat('es-PE', {
   currency: 'PEN',
@@ -188,6 +203,7 @@ function createDefaultValues(): MovimientoFormInput {
   ordenTrabajo: '',
   areaSolicitante: '',
   solicitante: '',
+  personalRetiraId: null,
   responsableEntrega: '',
   responsableRecepcion: '',
   guiaSerie: '',
@@ -207,6 +223,39 @@ function createDefaultValues(): MovimientoFormInput {
   observacion: '',
   confirmar: false,
   detalles: [createDetalleInicial()],
+  }
+}
+
+function appendOrReplaceById<T extends { id: number }>(items: T[] | undefined, item: T) {
+  const currentItems = items ?? []
+  const exists = currentItems.some((currentItem) => currentItem.id === item.id)
+
+  if (exists) {
+    return currentItems.map((currentItem) => (currentItem.id === item.id ? item : currentItem))
+  }
+
+  return [...currentItems, item]
+}
+
+function formatPersonalLabel(personal: Personal) {
+  return [
+    personal.numeroDocumento,
+    [personal.nombres, personal.apellidos].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(' - ')
+}
+
+function toPersonalPayload(values: PersonalFormValues): PersonalPayload {
+  return {
+    tipoDocumento: normalizeBusinessText(values.tipoDocumento),
+    numeroDocumento: normalizeBusinessText(values.numeroDocumento),
+    nombres: normalizeBusinessText(values.nombres),
+    apellidos: normalizeOptionalBusinessText(values.apellidos),
+    cargo: normalizeOptionalBusinessText(values.cargo),
+    area: normalizeOptionalBusinessText(values.area),
+    telefono: normalizePhone(values.telefono),
+    email: normalizeOptionalEmail(values.email),
   }
 }
 
@@ -247,11 +296,12 @@ function movimientoRules(tipoMovimiento: TipoMovimiento) {
   const requireMotivo =
     isEntradaAjuste || isSalidaConsumo || isSalidaAjuste || isAjustePositivo || isAjusteNegativo
   const showObservacion = true
-  const requireObservacion =
-    isEntradaAjuste || isSalidaConsumo || isSalidaAjuste || isAjustePositivo || isAjusteNegativo
+  const requireObservacion = false
+  const showPersonalRetira = isSalidaConsumo || isSalidaVenta
 
   return {
     isEntradaCompra,
+    requirePersonalRetira: showPersonalRetira,
     requireCostoUnitario: isEntradaCompra,
     requireMotivo,
     requireObservacion,
@@ -261,9 +311,10 @@ function movimientoRules(tipoMovimiento: TipoMovimiento) {
     showMotivo,
     showObservacion,
     showOrdenTrabajo: isSalidaConsumo || isSalidaVenta,
+    showPersonalRetira,
     showProveedor: isEntradaCompra || isEntradaAjuste,
     showResponsables: isTransferencia,
-    showSolicitante: isSalidaConsumo,
+    showSolicitante: false,
     useCostoAutomatico:
       isSalidaConsumo || isSalidaVenta || isSalidaAjuste || isTransferencia || isAjusteNegativo,
   }
@@ -285,15 +336,22 @@ export function MovimientoFormModal({
   isSaving,
   onClose,
   onSubmit,
+  personal,
   productos,
   proveedores,
   ubicaciones,
 }: MovimientoFormModalProps) {
+  const queryClient = useQueryClient()
   const [pendingConfirmValues, setPendingConfirmValues] = useState<MovimientoFormValues | null>(null)
   const [stockLineaState, setStockLineaState] = useState<Record<number, StockLineaState>>({})
   const [stockConfirmError, setStockConfirmError] = useState<string | null>(null)
   const [customRecargoLines, setCustomRecargoLines] = useState<Record<string, boolean>>({})
   const [expandedSections, setExpandedSections] = useState(INITIAL_EXPANDED_SECTIONS)
+  const [isQuickPersonalOpen, setIsQuickPersonalOpen] = useState(false)
+  const [isQuickPersonalSaving, setIsQuickPersonalSaving] = useState(false)
+  const [quickPersonalError, setQuickPersonalError] = useState<string | null>(null)
+  const [quickFeedback, setQuickFeedback] = useState<string | null>(null)
+  const [quickPersonalOptions, setQuickPersonalOptions] = useState<Personal[]>([])
   const productosByIdRef = useRef(new Map<number, Producto>())
   const formRef = useRef<HTMLFormElement>(null)
   const previousAlmacenOrigen = useRef<number | null>(null)
@@ -315,6 +373,7 @@ export function MovimientoFormModal({
   })
   const tipoMovimiento = useWatch({ control, name: 'tipoMovimiento' }) as TipoMovimiento
   const proveedorValue = useWatch({ control, name: 'proveedorId' })
+  const personalRetiraValue = useWatch({ control, name: 'personalRetiraId' })
   const almacenOrigenValue = useWatch({ control, name: 'almacenOrigenId' })
   const almacenDestinoValue = useWatch({ control, name: 'almacenDestinoId' })
   const detalles = useWatch({ control, name: 'detalles' })
@@ -434,6 +493,18 @@ export function MovimientoFormModal({
       })),
     [proveedores],
   )
+  const personalOptions = useMemo(
+    () =>
+      [...personal, ...quickPersonalOptions]
+        .filter(
+          (item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index,
+        )
+        .map((item) => ({
+          label: formatPersonalLabel(item),
+          value: item.id,
+        })),
+    [personal, quickPersonalOptions],
+  )
   const buscarProductos = useCallback(async (texto: string) => {
     const response = await productoService.getProductos({
       activo: true,
@@ -468,6 +539,20 @@ export function MovimientoFormModal({
     }))
   }, [])
 
+  const buscarPersonal = useCallback(async (texto: string) => {
+    const response = await personalService.getPersonal({
+      activo: true,
+      page: 0,
+      size: 10,
+      texto,
+    })
+
+    return response.content.map((item) => ({
+      label: formatPersonalLabel(item),
+      value: item.id,
+    }))
+  }, [])
+
   const resolverOpcionesProveedor = useCallback(
     async (texto: string) => {
       if (!texto.trim()) {
@@ -477,6 +562,17 @@ export function MovimientoFormModal({
       return buscarProveedores(texto)
     },
     [buscarProveedores, proveedorOptions],
+  )
+
+  const resolverOpcionesPersonal = useCallback(
+    async (texto: string) => {
+      if (!texto.trim()) {
+        return personalOptions.slice(0, 20)
+      }
+
+      return buscarPersonal(texto)
+    },
+    [buscarPersonal, personalOptions],
   )
 
   const resolverOpcionesProducto = useCallback(
@@ -630,6 +726,8 @@ export function MovimientoFormModal({
       setCustomRecargoLines({})
       setStockLineaState({})
       setStockConfirmError(null)
+      setQuickFeedback(null)
+      setQuickPersonalError(null)
       setExpandedSections({ ...INITIAL_EXPANDED_SECTIONS })
     }, 0)
 
@@ -664,6 +762,8 @@ export function MovimientoFormModal({
     setCustomRecargoLines({})
     setStockLineaState({})
     setStockConfirmError(null)
+    setQuickFeedback(null)
+    setQuickPersonalError(null)
   }, [isOpen, replace, reset, tipoMovimiento])
 
   useEffect(() => {
@@ -723,6 +823,42 @@ export function MovimientoFormModal({
     formRef.current?.scrollTo?.({ behavior: 'smooth', top: 0 })
   }, [errorMessage])
 
+  const openQuickPersonalModal = () => {
+    setQuickPersonalError(null)
+    setQuickFeedback(null)
+    setIsQuickPersonalOpen(true)
+  }
+
+  const closeQuickPersonalModal = () => {
+    if (isQuickPersonalSaving) {
+      return
+    }
+
+    setIsQuickPersonalOpen(false)
+    setQuickPersonalError(null)
+  }
+
+  const handleQuickPersonalSubmit = async (values: PersonalFormValues) => {
+    setIsQuickPersonalSaving(true)
+    setQuickPersonalError(null)
+
+    try {
+      const creado = await personalService.createPersonal(toPersonalPayload(values))
+      setQuickPersonalOptions((current) => appendOrReplaceById(current, creado))
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['personal-activo-movimientos'] }),
+        queryClient.invalidateQueries({ queryKey: ['personal'] }),
+      ])
+      setValue('personalRetiraId', creado.id, { shouldDirty: true, shouldValidate: true })
+      setIsQuickPersonalOpen(false)
+      setQuickFeedback('Personal creado y seleccionado correctamente.')
+    } catch (error) {
+      setQuickPersonalError(getPersonalApiErrorMessage(error))
+    } finally {
+      setIsQuickPersonalSaving(false)
+    }
+  }
+
   if (!isOpen) {
     return null
   }
@@ -758,6 +894,12 @@ export function MovimientoFormModal({
               role="alert"
             >
               {errorMessage}
+            </div>
+          ) : null}
+
+          {quickFeedback ? (
+            <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {quickFeedback}
             </div>
           ) : null}
 
@@ -882,6 +1024,7 @@ export function MovimientoFormModal({
           (rules.showMotivo ||
             rules.showOrdenTrabajo ||
             rules.showAreaSolicitante ||
+            rules.showPersonalRetira ||
             rules.showSolicitante ||
             rules.showResponsables ||
             rules.showObservacion) ? (
@@ -915,12 +1058,14 @@ export function MovimientoFormModal({
                 {rules.showOrdenTrabajo ? (
                   <label className="block">
                     <span className={labelClass}>
-                      {isSalidaVenta ? 'Orden de Servicio (OS) *' : 'Orden trabajo (opcional)'}
+                      {isSalidaVenta
+                        ? 'Orden de Servicio (OS) *'
+                        : 'Orden de Servicio (OS) (opcional)'}
                     </span>
                     <input
                       aria-label={isSalidaVenta ? 'Orden de Servicio (OS)' : undefined}
                       className={inputClass}
-                      placeholder={isSalidaVenta ? 'Ej. OS-002541' : undefined}
+                      placeholder="Ej. OS-002541"
                       {...register('ordenTrabajo')}
                     />
                     {isSalidaVenta ? (
@@ -941,6 +1086,46 @@ export function MovimientoFormModal({
                     <span className={labelClass}>Area solicitante (opcional)</span>
                     <input className={inputClass} {...register('areaSolicitante')} />
                   </label>
+                ) : null}
+
+                {rules.showPersonalRetira ? (
+                  <div className="block">
+                    <span className={labelClass}>
+                      Personal que retira/solicita {rules.requirePersonalRetira ? '' : '(opcional)'}
+                    </span>
+                    <div className="flex gap-2">
+                      <SearchableSelect
+                        ariaLabel="Personal que retira/solicita"
+                        emptyLabel="Sin resultados"
+                        key={`personal-retira-${tipoMovimiento}`}
+                        onChange={(value) =>
+                          setValue('personalRetiraId', value, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          })
+                        }
+                        onSearch={resolverOpcionesPersonal}
+                        placeholder="Buscar personal"
+                        prefetchedOptions={personalOptions}
+                        value={Number(personalRetiraValue || 0) || null}
+                      />
+                      <button
+                        aria-label="Nuevo personal que retira o solicita"
+                        className={quickCatalogButtonClass}
+                        disabled={isQuickPersonalSaving}
+                        onClick={openQuickPersonalModal}
+                        title="Nuevo personal que retira o solicita"
+                        type="button"
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </div>
+                    {errors.personalRetiraId ? (
+                      <span className="mt-1 block text-sm text-red-600">
+                        {errors.personalRetiraId.message}
+                      </span>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 {rules.showSolicitante ? (
@@ -1798,6 +1983,15 @@ export function MovimientoFormModal({
           </div>
         </form>
       </section>
+
+      <PersonalFormModal
+        errorMessage={quickPersonalError}
+        isOpen={isQuickPersonalOpen}
+        isSaving={isQuickPersonalSaving}
+        mode="create"
+        onClose={closeQuickPersonalModal}
+        onSubmit={handleQuickPersonalSubmit}
+      />
 
       {pendingConfirmValues ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4">

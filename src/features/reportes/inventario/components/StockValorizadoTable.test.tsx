@@ -15,6 +15,7 @@ const rows: StockValorizadoItem[] = [
     almacen: 'ALMACEN GENERAL',
     ubicacionId: 1,
     ubicacion: 'A1 - 1',
+    unidadMedida: 'UND',
     cantidadActual: 130,
     stockMinimo: 10,
     costoPromedio: 11.3333,
@@ -28,6 +29,7 @@ const resumen: StockValorizadoResumen = {
   cantidadUnidades: 130,
   valorTotalInventario: 1473.3333,
   productosBajoMinimo: 0,
+  productosSinStockActivos: 0,
 }
 
 describe('StockValorizadoTable', () => {
@@ -51,5 +53,7 @@ describe('StockValorizadoTable', () => {
     )
     expect(screen.queryByText(/11\.3333/)).not.toBeInTheDocument()
     expect(screen.getByText('11.33')).toBeInTheDocument()
+    expect(screen.getByText('UND')).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Familia' })).not.toBeInTheDocument()
   })
 })

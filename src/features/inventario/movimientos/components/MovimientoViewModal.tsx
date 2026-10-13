@@ -2,10 +2,12 @@ import { FileText, RotateCcw, X } from 'lucide-react'
 import { useState } from 'react'
 import logoBallena from '../../../../assets/images/logo_ballena_02.png'
 import { formatApiDate, formatApiDateTime } from '../../../../shared/utils/dateTime'
+import { openPdf } from '../../../../shared/utils/downloads'
 import { formatOptionalCurrency } from '../../../../shared/utils/numberFormat'
 import { openPdfReport } from '../../../../shared/utils/pdfReport'
 import { MovimientoDetalleTable } from './MovimientoDetalleTable'
 import { MovimientoValorizacionComercial } from './MovimientoValorizacionComercial'
+import { movimientoService } from '../services/movimientoService'
 import type { Movimiento } from '../types/movimiento.types'
 import { formatMovimientoLabel } from '../utils/movimientoLabels'
 
@@ -44,8 +46,18 @@ function formatPdfNumber(value?: number | null) {
 
   return new Intl.NumberFormat('es-PE', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
+    maximumFractionDigits: 2,
   }).format(value)
+}
+
+export function usesSalidaPdfTemplate(tipoMovimiento: Movimiento['tipoMovimiento']) {
+  return [
+    'SALIDA_CONSUMO',
+    'SALIDA_VENTA',
+    'SALIDA_AJUSTE',
+    'AJUSTE_NEGATIVO',
+    'DEVOLUCION_PROVEEDOR',
+  ].includes(tipoMovimiento)
 }
 
 export function MovimientoViewModal({
@@ -74,6 +86,11 @@ export function MovimientoViewModal({
     setIsPdfLoading(true)
 
     try {
+      if (usesSalidaPdfTemplate(movimiento.tipoMovimiento)) {
+        openPdf(await movimientoService.getMovimientoPdf(movimiento.id))
+        return
+      }
+
       await openPdfReport({
         filename: `movimiento-${movimiento.numero}.pdf`,
         filters: [
@@ -84,6 +101,12 @@ export function MovimientoViewModal({
           ['Almacen origen', movimiento.almacenOrigenNombre],
           ['Almacen destino', movimiento.almacenDestinoNombre],
           ['Proveedor', movimiento.proveedorRazonSocial],
+          [
+            'Personal retira/solicita',
+            [movimiento.personalRetiraNumeroDocumento, movimiento.personalRetiraNombreCompleto]
+              .filter(Boolean)
+              .join(' - '),
+          ],
           ['Documento', movimiento.documentoReferencia],
           ['Nota de credito', movimiento.numeroNotaCredito],
           ['Usuario', movimiento.username],
@@ -193,7 +216,17 @@ export function MovimientoViewModal({
                 {movimiento.tipoMovimiento === 'SALIDA_VENTA' ? (
                   <InfoItem label="Orden de Servicio (OS)" value={movimiento.ordenTrabajo} />
                 ) : movimiento.tipoMovimiento === 'SALIDA_CONSUMO' ? (
-                  <InfoItem label="Orden trabajo" value={movimiento.ordenTrabajo} />
+                  <InfoItem label="Orden de Servicio (OS)" value={movimiento.ordenTrabajo} />
+                ) : null}
+                {['SALIDA_CONSUMO', 'SALIDA_VENTA'].includes(movimiento.tipoMovimiento) ? (
+                  <InfoItem
+                    label="Personal retira/solicita"
+                    value={
+                      [movimiento.personalRetiraNumeroDocumento, movimiento.personalRetiraNombreCompleto]
+                        .filter(Boolean)
+                        .join(' - ') || null
+                    }
+                  />
                 ) : null}
                 <InfoItem label="Almacen origen" value={movimiento.almacenOrigenNombre} />
                 <InfoItem label="Almacen destino" value={movimiento.almacenDestinoNombre} />

@@ -76,7 +76,9 @@ export function UbicacionesPage() {
   const [editLoadingId, setEditLoadingId] = useState<number | null>(null)
 
   const canView = can(user, 'ALMACEN_VER')
-  const canManage = can(user, 'USUARIO_ADMIN')
+  const canCreate = can(user, 'ALMACEN_CREAR')
+  const canEdit = can(user, 'ALMACEN_EDITAR')
+  const canToggle = can(user, 'ALMACEN_DESACTIVAR')
 
   const filters = useMemo(
     () => ({
@@ -254,7 +256,7 @@ export function UbicacionesPage() {
             <RefreshCw size={17} />
             Actualizar
           </button>
-          {canManage ? (
+          {canCreate ? (
             <button
               className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
               disabled={almacenes.length === 0}
@@ -299,12 +301,13 @@ export function UbicacionesPage() {
       </Card>
 
       <UbicacionTable
-        canManage={canManage}
+        actionLoadingId={toggleMutation.isPending ? confirmAction?.ubicacion.id : editLoadingId}
+        canEdit={canEdit}
+        canToggle={canToggle}
         isLoading={ubicacionesQuery.isLoading}
         onActivar={(ubicacion) => setConfirmAction({ ubicacion, type: 'activar' })}
         onDesactivar={(ubicacion) => setConfirmAction({ ubicacion, type: 'desactivar' })}
         onEdit={openEditModal}
-        toggleLoadingId={toggleMutation.isPending ? confirmAction?.ubicacion.id : editLoadingId}
         ubicaciones={ubicaciones}
       />
 

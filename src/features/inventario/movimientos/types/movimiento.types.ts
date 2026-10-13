@@ -81,6 +81,9 @@ export type Movimiento = {
   ordenTrabajo?: string | null
   areaSolicitante?: string | null
   solicitante?: string | null
+  personalRetiraId?: number | null
+  personalRetiraNumeroDocumento?: string | null
+  personalRetiraNombreCompleto?: string | null
   responsableEntrega?: string | null
   responsableRecepcion?: string | null
   guiaSerie?: string | null
@@ -139,6 +142,7 @@ export type MovimientoPayload = {
   ordenTrabajo?: string | null
   areaSolicitante?: string | null
   solicitante?: string | null
+  personalRetiraId?: number | null
   responsableEntrega?: string | null
   responsableRecepcion?: string | null
   guiaSerie?: string | null

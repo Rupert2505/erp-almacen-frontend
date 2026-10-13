@@ -9,6 +9,7 @@ import { can } from '../../../../shared/utils/permissions'
 import { almacenService } from '../../../almacenes/services/almacenService'
 import { ubicacionService } from '../../../almacenes/services/ubicacionService'
 import { useAuth } from '../../../auth/context/useAuth'
+import { personalService } from '../../../personal/services/personalService'
 import { productoService } from '../../../productos/services/productoService'
 import { proveedorService } from '../../../proveedores/services/proveedorService'
 import { MovimientoAnularModal } from '../components/MovimientoAnularModal'
@@ -103,6 +104,7 @@ function toPayload(values: MovimientoFormValues, confirmar = false): MovimientoP
   ].includes(tipoMovimiento)
   const usaDatosConsumo = tipoMovimiento === 'SALIDA_CONSUMO'
   const usaOrdenTrabajo = usaDatosConsumo || tipoMovimiento === 'SALIDA_VENTA'
+  const usaPersonalRetira = usaDatosConsumo || tipoMovimiento === 'SALIDA_VENTA'
   const usaResponsables = tipoMovimiento === 'TRANSFERENCIA'
 
   return {
@@ -116,6 +118,7 @@ function toPayload(values: MovimientoFormValues, confirmar = false): MovimientoP
     ordenTrabajo: usaOrdenTrabajo ? values.ordenTrabajo?.trim() || null : null,
     areaSolicitante: usaDatosConsumo ? values.areaSolicitante?.trim() || null : null,
     solicitante: usaDatosConsumo ? values.solicitante?.trim() || null : null,
+    personalRetiraId: usaPersonalRetira ? values.personalRetiraId : null,
     responsableEntrega: usaResponsables ? values.responsableEntrega?.trim() || null : null,
     responsableRecepcion: usaResponsables
       ? values.responsableRecepcion?.trim() || null
@@ -175,6 +178,7 @@ export function MovimientosPage() {
   const canCreateDevolucion = can(user, 'INVENTARIO_DEVOLUCION_CREAR')
   const canViewDevolucion = can(user, 'INVENTARIO_DEVOLUCION_VER')
   const canExportReportes = can(user, 'REPORTE_EXPORTAR')
+  const canUsePersonalInSalida = can(user, 'INVENTARIO_SALIDA') || can(user, 'USUARIO_ADMIN')
 
   const filters = useMemo(
     () => ({
@@ -231,6 +235,18 @@ export function MovimientosPage() {
         activo: true,
         page: 0,
         size: 500,
+        texto: '',
+      }),
+  })
+
+  const personalQuery = useQuery({
+    enabled: canView && canUsePersonalInSalida,
+    queryKey: ['personal-activo-movimientos'],
+    queryFn: () =>
+      personalService.getPersonal({
+        activo: true,
+        page: 0,
+        size: 50,
         texto: '',
       }),
   })
@@ -714,6 +730,7 @@ export function MovimientosPage() {
             values,
           })
         }}
+        personal={personalQuery.data?.content ?? []}
         productos={productosQuery.data?.content ?? []}
         proveedores={proveedoresQuery.data?.content ?? []}
         ubicaciones={ubicacionesQuery.data?.content ?? []}

@@ -62,6 +62,24 @@ function renderFilters(overrides: Partial<FiltersProps> = {}) {
 }
 
 describe('ReporteInventarioFilters', () => {
+  it('ubica las acciones de exportacion antes de limpiar y consultar', () => {
+    renderFilters({
+      actions: (
+        <>
+          <button type="button">PDF informe</button>
+          <button type="button">Exportar data</button>
+        </>
+      ),
+    })
+
+    const labels = screen
+      .getAllByRole('button')
+      .map((button) => button.textContent)
+      .filter(Boolean)
+
+    expect(labels.slice(-4)).toEqual(['PDF informe', 'Exportar data', 'Limpiar', 'Consultar'])
+  })
+
   it('muestra solo los filtros aceptados por el endpoint y comunica el estado por defecto', async () => {
     const onOrdenTrabajoChange = vi.fn()
     renderFilters({ onOrdenTrabajoChange })

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { firstAuthorizedPath } from '../../../app/router/routeAccess'
 import { AUTH_UNAUTHORIZED_EVENT } from '../../../shared/utils/storageKeys'
 import {
   authService,
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       persistAuthSession(response)
       setUser(response)
       setStatus('authenticated')
-      navigate('/reportes/inventario', { replace: true })
+      navigate(firstAuthorizedPath(response) ?? '/403', { replace: true })
     },
     [navigate],
   )

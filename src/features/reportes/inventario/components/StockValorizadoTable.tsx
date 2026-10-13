@@ -44,7 +44,7 @@ export function StockValorizadoTable({
   showCosts,
   totalLines,
 }: StockValorizadoTableProps) {
-  const colSpan = showCosts ? 10 : 8
+  const colSpan = showCosts ? 9 : 7
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -81,7 +81,6 @@ export function StockValorizadoTable({
           <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Producto</th>
-              <th className="px-4 py-3">Familia</th>
               <th className="px-4 py-3">U.M.</th>
               <th className="px-4 py-3">Almacen</th>
               <th className="px-4 py-3">Ubicacion</th>
@@ -112,12 +111,6 @@ export function StockValorizadoTable({
                     <div className="space-y-1">
                       <ProductCodeBadge code={row.codigoProducto} />
                       <p className="font-medium leading-5 text-slate-950">{row.nombreProducto}</p>
-                    </div>
-                  </td>
-                  <td className="min-w-48 px-4 py-3 text-slate-600">
-                    <div className="space-y-1">
-                      <p>{row.familia || '-'}</p>
-                      <p className="text-xs text-slate-500">{row.subfamilia || 'Sin subfamilia'}</p>
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">

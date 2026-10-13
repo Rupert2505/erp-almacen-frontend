@@ -4,11 +4,7 @@ import { useMemo, useState } from 'react'
 import logoBallena from '../../../../assets/images/logo_ballena_02.png'
 import { Card } from '../../../../shared/components/Card'
 import { PageHeader } from '../../../../shared/components/PageHeader'
-import {
-  downloadBlob,
-  downloadExcel,
-  filenameFromDisposition,
-} from '../../../../shared/utils/downloads'
+import { downloadExcel, filenameFromDisposition } from '../../../../shared/utils/downloads'
 import { downloadPdfReport } from '../../../../shared/utils/pdfReport'
 import { can } from '../../../../shared/utils/permissions'
 import { almacenService } from '../../../almacenes/services/almacenService'
@@ -40,8 +36,21 @@ import {
   getReporteInventarioApiErrorMessage,
   reporteInventarioService,
 } from '../services/reporteInventarioService'
+import { buildEntradasProveedorPdfTable } from '../utils/entradasProveedorPdf'
+import {
+  buildEntradasProveedorPdfSummary,
+  buildKardexPdfSummary,
+  buildSalidasPdfSummary,
+} from '../utils/inventoryPdfSummaries'
+import { buildBajoMinimoPdfRow, buildKardexPdfRow, buildSalidaPdfRow } from '../utils/inventoryPdfRows'
+import { getCurrentMonthDateRange, reportUsesDateRange } from '../utils/reportDateRange'
+import { buildMovimientoPdfRow } from '../utils/movimientoPdfRow'
 import { formatReportDecimal } from '../utils/reportNumberFormat'
+import { fetchAllReportRows } from '../utils/reportPagination'
+import { buildSalidasPorOsPdfTable } from '../utils/salidasPorOsPdf'
+import { buildStockValorizadoPdfSummary } from '../utils/stockValorizadoPdfSummary'
 import type {
+  EntradaProveedorResumen,
   EntradaProveedorReporte,
   KardexValorizadoReporte,
   PageResponse,
@@ -49,9 +58,11 @@ import type {
   ReporteInventarioFilters as ReporteFilters,
   ReporteInventarioTipo,
   ReporteMovimientoItem,
+  SalidaInventarioResumen,
   SalidaInventarioReporte,
   SalidaValorizadaOsReporteResponse,
   StockValorizadoReporte,
+  StockValorizadoResumen,
 } from '../types/reporteInventario.types'
 
 const PAGE_SIZE = 10
@@ -172,30 +183,6 @@ function defaultTipoForReporte(reporte: ReporteInventarioTipo, current: TipoMovi
   return TIPOS_MOVIMIENTO.includes(current as TipoMovimiento) ? current : ''
 }
 
-function csvValue(value: unknown) {
-  if (value === undefined || value === null) {
-    return ''
-  }
-
-  const text = String(value).replaceAll('"', '""')
-  return `"${text}"`
-}
-
-function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
-  if (rows.length === 0) {
-    downloadBlob(new Blob([''], { type: 'text/csv;charset=utf-8' }), filename)
-    return
-  }
-
-  const headers = Object.keys(rows[0])
-  const csv = [
-    headers.map(csvValue).join(','),
-    ...rows.map((row) => headers.map((header) => csvValue(row[header])).join(',')),
-  ].join('\n')
-
-  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), filename)
-}
-
 function formatDateTime(value?: string | null) {
   return value ? new Date(value).toLocaleString('es-PE') : ''
 }
@@ -213,11 +200,14 @@ export function ReportesInventarioPage({
   title = 'Reportes de inventario',
 }: ReportesInventarioPageProps) {
   const { user } = useAuth()
+  const [{ fechaDesde: initialFechaDesde, fechaHasta: initialFechaHasta }] = useState(
+    getCurrentMonthDateRange,
+  )
   const [reporte, setReporte] = useState<ReporteInventarioTipo>('movimientos')
   const [texto, setTexto] = useState('')
   const [ordenTrabajo, setOrdenTrabajo] = useState('')
-  const [fechaDesde, setFechaDesde] = useState('')
-  const [fechaHasta, setFechaHasta] = useState('')
+  const [fechaDesde, setFechaDesde] = useState(initialFechaDesde)
+  const [fechaHasta, setFechaHasta] = useState(initialFechaHasta)
   const [productoId, setProductoId] = useState<number | null>(null)
   const [almacenId, setAlmacenId] = useState<number | null>(null)
   const [ubicacionId, setUbicacionId] = useState<number | null>(null)
@@ -247,8 +237,8 @@ export function ReportesInventarioPage({
         ? estado
         : '',
       familiaId,
-      fechaDesde,
-      fechaHasta,
+      fechaDesde: reportUsesDateRange(reporte) ? fechaDesde : '',
+      fechaHasta: reportUsesDateRange(reporte) ? fechaHasta : '',
       marcaId: reporte === 'stock-valorizado' ? marcaId : null,
       ordenTrabajo: reporte === 'salidas-por-os' ? ordenTrabajo : '',
       page,
@@ -433,10 +423,12 @@ export function ReportesInventarioPage({
   }
 
   const handleClear = () => {
+    const defaultDateRange = getCurrentMonthDateRange()
+
     setTexto('')
     setOrdenTrabajo('')
-    setFechaDesde('')
-    setFechaHasta('')
+    setFechaDesde(defaultDateRange.fechaDesde)
+    setFechaHasta(defaultDateRange.fechaHasta)
     setProductoId(null)
     setAlmacenId(null)
     setUbicacionId(null)
@@ -540,57 +532,28 @@ export function ReportesInventarioPage({
         return
       }
 
-      if (reporte === 'movimientos') {
-        downloadCsv(
-          'movimientos-inventario.csv',
-          (movimientosQuery.data?.content ?? []).map((row) => ({
-            movimiento: row.numero,
-            tipo: row.tipoMovimiento,
-            estado: row.estado,
-            fecha: row.fechaMovimiento,
-            documentoReferencia: row.documentoReferencia,
-            productoCodigo: row.productoCodigo,
-            productoNombre: row.productoNombre,
-            almacenOrigen: row.almacenOrigenNombre,
-            almacenDestino: row.almacenDestinoNombre,
-            cantidad: row.cantidad,
-            costoUnitario: row.costoUnitario,
-            totalLinea: row.totalLinea,
-          })),
-        )
-        return
-      }
-
-      if (reporte === 'productos-bajo-minimo') {
-        downloadCsv(
-          'productos-bajo-minimo.csv',
-          (bajoMinimoQuery.data?.content ?? []).map((row) => ({
-            productoCodigo: row.productoCodigo,
-            productoNombre: row.productoNombre,
-            categoria: row.categoriaNombre,
-            almacen: row.almacenNombre,
-            cantidadActual: row.cantidadActual,
-            stockMinimo: row.stockMinimo,
-            diferencia: row.diferencia,
-          })),
-        )
-        return
-      }
-
-      const exportCall =
-        reporte === 'stock-valorizado'
-          ? reporteInventarioService.exportStockValorizado
-          : reporte === 'kardex-valorizado'
-            ? reporteInventarioService.exportKardexValorizado
-          : reporte === 'salidas-detalle'
-            ? reporteInventarioService.exportSalidasDetalle
-            : reporte === 'salidas-por-os'
-              ? reporteInventarioService.exportSalidasPorOs
-              : reporteInventarioService.exportEntradasProveedor
-      const { blob, filename } = await exportCall({
+      const exportFilters = {
         ...filters,
         productoId: exportProductoId,
-      })
+      }
+
+      let exportCall = reporteInventarioService.exportProductosBajoMinimo
+
+      if (reporte === 'movimientos') {
+        exportCall = reporteInventarioService.exportMovimientos
+      } else if (reporte === 'stock-valorizado') {
+        exportCall = reporteInventarioService.exportStockValorizado
+      } else if (reporte === 'kardex-valorizado') {
+        exportCall = reporteInventarioService.exportKardexValorizado
+      } else if (reporte === 'salidas-detalle') {
+        exportCall = reporteInventarioService.exportSalidasDetalle
+      } else if (reporte === 'salidas-por-os') {
+        exportCall = reporteInventarioService.exportSalidasPorOs
+      } else if (reporte === 'entradas-proveedor') {
+        exportCall = reporteInventarioService.exportEntradasProveedor
+      }
+
+      const { blob, filename } = await exportCall(exportFilters)
       downloadExcel(blob, filenameFromDisposition(filename, reporte))
     } catch (requestError) {
       setExportError(getReporteInventarioApiErrorMessage(requestError))
@@ -632,8 +595,8 @@ export function ReportesInventarioPage({
     ['Reporte', selectedReporte?.label],
     ['Texto', texto],
     ['Orden de Servicio (OS)', ordenTrabajo],
-    ['Fecha desde', fechaDesde],
-    ['Fecha hasta', fechaHasta],
+    ['Fecha desde', reportUsesDateRange(reporte) ? fechaDesde : ''],
+    ['Fecha hasta', reportUsesDateRange(reporte) ? fechaHasta : ''],
     [
       'Producto',
       selectedProducto ? `${selectedProducto.codigo} - ${selectedProducto.nombre}` : '',
@@ -679,56 +642,78 @@ export function ReportesInventarioPage({
 
       const pdfFilters = {
         ...filters,
-        page: 0,
         productoId: pdfProductoId,
-        size: 10000,
       }
       const reportTitle = selectedReporte?.label
         ? `Reporte de ${selectedReporte.label.toLowerCase()}`
         : 'Reporte de inventario'
 
       if (reporte === 'movimientos') {
-        const data = await reporteInventarioService.getMovimientos(pdfFilters)
+        const rows = await fetchAllReportRows((page, size) =>
+          reporteInventarioService.getMovimientos({ ...pdfFilters, page, size }),
+        )
         await downloadPdfReport({
+          columnWeights: {
+            cantidad: 1.15,
+            documento: 1.35,
+            movimiento: 1.35,
+            producto: 2.25,
+            'total linea': 1.15,
+          },
           filename: reportFilename(reporte),
           filters: reportFilters(),
           logoSrc: logoBallena,
           subtitle: selectedReporte?.description,
+          tableHeaderFontSize: 5.8,
+          tableRowFontSize: 5.8,
+          tableRowHeight: 44,
+          tableRowLineHeight: 8,
+          tableRowMaxLines: 4,
           title: reportTitle,
-          rows: data.content.map((row) => ({
-            Movimiento: row.numero,
-            Tipo: formatMovimientoLabel(row.tipoMovimiento),
-            Estado: formatMovimientoLabel(row.estado),
-            Fecha: formatDateTime(row.fechaMovimiento),
-            Documento: row.documentoReferencia,
-            Producto: [row.productoCodigo, row.productoNombre].filter(Boolean).join(' - '),
-            'Almacen origen': row.almacenOrigenNombre,
-            'Almacen destino': row.almacenDestinoNombre,
-            Cantidad: formatReportNumber(row.cantidad),
-            ...(canViewCosts
-              ? {
-                  'Costo unitario': formatReportNumber(row.costoUnitario),
-                  'Total linea': formatReportNumber(row.totalLinea),
-                }
-              : {}),
-          })),
+          rows: rows.map((row) => buildMovimientoPdfRow(row, canViewCosts)),
         })
         return
       }
 
       if (reporte === 'stock-valorizado') {
-        const data = await reporteInventarioService.getStockValorizado(pdfFilters)
+        let stockSummary: StockValorizadoResumen | null | undefined
+        const rows = await fetchAllReportRows(async (page, size) => {
+          const data = await reporteInventarioService.getStockValorizado({
+            ...pdfFilters,
+            page,
+            size,
+          })
+          stockSummary ??= data.resumen
+          return data.registros
+        })
         await downloadPdfReport({
+          columnWeights: {
+            almacen: 1.25,
+            codigo: 1.05,
+            'costo promedio': 1.05,
+            estado: 1,
+            producto: 2.2,
+            stock: 0.75,
+            'stock minimo': 0.95,
+            'u.m.': 0.55,
+            ubicacion: 0.9,
+            'valor total': 1,
+          },
           filename: reportFilename(reporte),
           filters: reportFilters(),
           logoSrc: logoBallena,
           subtitle: selectedReporte?.description,
+          summary: buildStockValorizadoPdfSummary(stockSummary, canViewCosts),
+          summaryTitle: 'Resumen de stock valorizado',
+          tableHeaderFontSize: 6,
+          tableRowFontSize: 5.9,
+          tableRowLineHeight: 8.5,
+          tableRowMaxLines: 3,
           title: reportTitle,
-          rows: data.registros.content.map((row) => ({
+          rows: rows.map((row) => ({
             Codigo: row.codigoProducto,
             Producto: row.nombreProducto,
-            Familia: row.familia,
-            Unidad: row.unidadMedida,
+            'U.M.': row.unidadMedida,
             Almacen: row.almacen,
             Ubicacion: row.ubicacion,
             Stock: formatReportNumber(row.cantidadActual),
@@ -746,155 +731,260 @@ export function ReportesInventarioPage({
       }
 
       if (reporte === 'kardex-valorizado') {
-        const data = await reporteInventarioService.getKardexValorizado(pdfFilters)
+        const data = await reporteInventarioService.getKardexValorizado({
+          ...pdfFilters,
+          page: 0,
+          size: PAGE_SIZE,
+        })
         await downloadPdfReport({
+          centerAlignedColumns: ['Tipo'],
+          columnWeights: {
+            entrada: 0.72,
+            fecha: 1.05,
+            movimiento: 1.1,
+            salida: 0.72,
+            'saldo ant.': 0.82,
+            'saldo final': 0.82,
+            tipo: 1.12,
+            'costo mov.': 0.88,
+            'costo prom.': 0.88,
+            'valor entrada': 0.9,
+            'valor salida': 0.9,
+            'valor saldo': 0.9,
+          },
           filename: reportFilename(reporte),
           filters: reportFilters(),
+          infoColumns: 3,
           logoSrc: logoBallena,
+          rightAlignedColumns: [
+            'Entrada',
+            'Salida',
+            'Saldo ant.',
+            'Saldo final',
+            'Costo mov.',
+            'Costo prom.',
+            'Valor entrada',
+            'Valor salida',
+            'Valor saldo',
+          ],
           subtitle: selectedReporte?.description,
+          summary: buildKardexPdfSummary(data, canViewCosts),
+          summaryColumns: 6,
+          summaryTitle: 'Resumen del kardex',
+          tableHeaderFontSize: canViewCosts ? 5 : 6.2,
+          tableRowFontSize: canViewCosts ? 5.1 : 6.2,
+          tableRowHeight: 30,
+          tableRowLineHeight: 7,
+          tableRowMaxLines: 3,
           title: reportTitle,
-          rows: data.detalles.map((row) => ({
-            Fecha: formatDateTime(row.fecha),
-            Movimiento: row.numeroMovimiento,
-            Tipo: formatMovimientoLabel(row.tipoMovimiento),
-            Entrada: formatReportNumber(row.cantidadEntrada),
-            Salida: formatReportNumber(row.cantidadSalida),
-            'Saldo anterior': formatReportNumber(row.saldoAnterior),
-            'Saldo final': formatReportNumber(row.saldoFinal),
-            ...(canViewCosts
-              ? {
-                  'Costo movimiento': formatReportNumber(row.costoUnitarioMovimiento),
-                  'Costo promedio': formatReportNumber(row.costoPromedio),
-                  'Valor entrada': formatReportNumber(row.valorEntrada),
-                  'Valor salida': formatReportNumber(row.valorSalida),
-                  'Valor saldo': formatReportNumber(row.valorSaldo),
-                }
-              : {}),
-            Usuario: row.usuario,
-          })),
+          rows: data.detalles.map((row) => buildKardexPdfRow(row, canViewCosts, formatDateTime)),
         })
         return
       }
 
       if (reporte === 'entradas-proveedor') {
-        const data = await reporteInventarioService.getEntradasProveedor(pdfFilters)
+        let entradasSummary: EntradaProveedorResumen | null | undefined
+        const rows = await fetchAllReportRows(async (page, size) => {
+          const data = await reporteInventarioService.getEntradasProveedor({
+            ...pdfFilters,
+            page,
+            size,
+          })
+          entradasSummary ??= data.resumen
+          return data.registros
+        })
+        const groupedTable = buildEntradasProveedorPdfTable(rows, canViewCosts, formatDateTime)
         await downloadPdfReport({
+          centerAlignedColumns: ['Almacen', 'U.M.'],
+          columnWeights: {
+            almacen: 0.62,
+            cantidad: 0.7,
+            comprobante: 1.22,
+            'costo unit.': 0.84,
+            fecha: 1,
+            flete: 0.64,
+            guia: 0.85,
+            movimiento: 1.05,
+            movilidad: 0.68,
+            otros: 0.62,
+            producto: 2.1,
+            'u.m.': 0.5,
+            'valor linea': 0.86,
+          },
           filename: reportFilename(reporte),
           filters: reportFilters(),
+          infoColumns: 3,
           logoSrc: logoBallena,
+          recordCount: groupedTable.recordCount,
+          rightAlignedColumns: [
+            'Cantidad',
+            'Costo unit.',
+            'Valor linea',
+            'Flete',
+            'Movilidad',
+            'Otros',
+          ],
+          rowKinds: groupedTable.rowKinds,
           subtitle: selectedReporte?.description,
+          summary: buildEntradasProveedorPdfSummary(entradasSummary, canViewCosts),
+          summaryColumns: 5,
+          summaryTitle: 'Resumen de entradas',
+          tableHeaderFontSize: canViewCosts ? 4.6 : 5.8,
+          tableRowFontSize: canViewCosts ? 4.8 : 5.9,
+          tableRowHeight: 24,
+          tableRowLineHeight: 6.5,
+          tableRowMaxLines: 2,
           title: reportTitle,
-          rows: data.registros.content.map((row) => ({
-            Fecha: formatDateTime(row.fechaMovimiento),
-            Movimiento: row.numeroMovimiento,
-            Proveedor: [row.proveedorNumeroDocumento, row.proveedorRazonSocial]
-              .filter(Boolean)
-              .join(' - '),
-            Guia: [row.guiaSerie, row.guiaNumero].filter(Boolean).join('-'),
-            Comprobante: [row.comprobanteTipo, row.comprobanteSerie, row.comprobanteNumero]
-              .filter(Boolean)
-              .join(' '),
-            Almacen: row.almacenDestino,
-            Producto: [row.codigoProducto, row.nombreProducto].filter(Boolean).join(' - '),
-            Unidad: row.unidadMedida,
-            Cantidad: formatReportNumber(row.cantidad),
-            ...(canViewCosts
-              ? {
-                  'Costo unitario': formatReportNumber(row.costoUnitario),
-                  'Valor linea': formatReportNumber(row.valorLinea),
-                  Flete: formatReportNumber(row.flete),
-                  Movilidad: formatReportNumber(row.movilidad),
-                  'Otros gastos': formatReportNumber(row.otrosGastos),
-                }
-              : {}),
-          })),
+          rows: groupedTable.rows,
         })
         return
       }
 
       if (reporte === 'salidas-detalle') {
-        const data = await reporteInventarioService.getSalidasDetalle(pdfFilters)
+        let salidasSummary: SalidaInventarioResumen | null | undefined
+        const rows = await fetchAllReportRows(async (page, size) => {
+          const data = await reporteInventarioService.getSalidasDetalle({
+            ...pdfFilters,
+            page,
+            size,
+          })
+          salidasSummary ??= data.resumen
+          return data.registros
+        })
+        const commercialRows = canViewCosts
+          ? await fetchAllReportRows(async (page, size) => {
+              const data = await reporteInventarioService.getSalidasPorOs({
+                ...pdfFilters,
+                page,
+                size,
+              })
+              return data.registros
+            })
+          : []
+        const commercialByLine = new Map(
+          commercialRows.map((row) => [`${row.movimientoId}|${row.productoId}`, row]),
+        )
         await downloadPdfReport({
+          centerAlignedColumns: ['Tipo', 'U.M.'],
+          columnWeights: {
+            'base comercial s/igv': 0.85,
+            cantidad: 0.62,
+            'costo aplicado': 0.76,
+            fecha: 0.92,
+            movimiento: 1,
+            motivo: 1.05,
+            origen: 1,
+            'precio total c/igv': 0.9,
+            producto: 2.1,
+            recargo: 0.58,
+            tipo: 0.95,
+            'u.m.': 0.45,
+            'valor salida': 0.8,
+          },
           filename: reportFilename(reporte),
           filters: reportFilters(),
+          infoColumns: 3,
           logoSrc: logoBallena,
+          rightAlignedColumns: [
+            'Cantidad',
+            'Costo aplicado',
+            'Valor salida',
+            'Base comercial s/IGV',
+            'Recargo',
+            'Precio total c/IGV',
+          ],
           subtitle: selectedReporte?.description,
+          summary: buildSalidasPdfSummary(salidasSummary, canViewCosts),
+          summaryColumns: 4,
+          summaryTitle: 'Resumen de salidas',
+          tableHeaderFontSize: canViewCosts ? 4.5 : 5.8,
+          tableRowFontSize: canViewCosts ? 4.7 : 5.9,
+          tableRowHeight: 30,
+          tableRowLineHeight: canViewCosts ? 6.6 : 7.5,
+          tableRowMaxLines: 3,
           title: reportTitle,
-          rows: data.registros.content.map((row) => ({
-            Fecha: formatDateTime(row.fecha),
-            Movimiento: row.numeroMovimiento,
-            Tipo: formatMovimientoLabel(row.tipoMovimiento),
-            Estado: row.estado ? formatMovimientoLabel(row.estado) : '',
-            Almacen: row.almacenOrigen,
-            Ubicacion: row.ubicacionOrigen,
-            Producto: [row.codigoProducto, row.nombreProducto].filter(Boolean).join(' - '),
-            Unidad: row.unidadMedida,
-            Cantidad: formatReportNumber(row.cantidad),
-            ...(canViewCosts
-              ? {
-                  'Costo aplicado': formatReportNumber(row.costoPromedioAplicado),
-                  'Valor salida': formatReportNumber(row.valorSalida),
-                }
-              : {}),
-            Usuario: row.usuario,
-            Motivo: row.motivo,
-          })),
+          rows: rows.map((row) =>
+            buildSalidaPdfRow(
+              row,
+              canViewCosts,
+              formatDateTime,
+              commercialByLine.get(`${row.movimientoId}|${row.productoId}`),
+            ),
+          ),
         })
         return
       }
 
       if (reporte === 'salidas-por-os') {
-        const data = await reporteInventarioService.getSalidasPorOs(pdfFilters)
+        const rows = await fetchAllReportRows(async (page, size) => {
+          const data = await reporteInventarioService.getSalidasPorOs({
+            ...pdfFilters,
+            page,
+            size,
+          })
+          return data.registros
+        })
+        const groupedTable = buildSalidasPorOsPdfTable(rows, canViewCosts)
         await downloadPdfReport({
+          columnWeights: {
+            cantidad: 0.7,
+            'costo inventario': 1.05,
+            'precio base s/igv': 1.08,
+            'precio final c/igv': 1.12,
+            producto: 2.8,
+            recargo: 0.72,
+          },
           filename: reportFilename(reporte),
           filters: reportFilters(),
+          infoColumns: 3,
           logoSrc: logoBallena,
+          recordCount: groupedTable.recordCount,
+          rightAlignedColumns: [
+            'Cantidad',
+            'Costo inventario',
+            'Precio base s/IGV',
+            'Recargo',
+            'Precio final c/IGV',
+          ],
+          rowKinds: groupedTable.rowKinds,
           subtitle: selectedReporte?.description,
+          tableHeaderFontSize: 6.8,
+          tableRowFontSize: 6.6,
+          tableRowHeight: 24,
+          tableRowLineHeight: 8,
+          tableRowMaxLines: 2,
           title: reportTitle,
-          rows: data.registros.content.map((row) => ({
-            Fecha: formatDateTime(row.fecha),
-            Movimiento: row.numeroMovimiento,
-            Estado: formatMovimientoLabel(row.estado),
-            OS: row.ordenTrabajo,
-            Producto: [row.codigoProducto, row.descripcionProducto].filter(Boolean).join(' - '),
-            Unidad: row.unidadMedida,
-            Cantidad: formatReportNumber(row.cantidad),
-            ...(canViewCosts
-              ? {
-                  'Costo inventario unitario': formatReportNumber(row.costoInventarioUnitario),
-                  'Costo inventario total': formatReportNumber(row.costoInventarioTotal),
-                  'Costo base comercial sin IGV': formatReportNumber(
-                    row.costoBaseComercialUnitarioSinIgv,
-                  ),
-                  'Recargo comercial %': formatReportNumber(row.recargoAplicadoPct),
-                  'Valor unitario sin IGV': formatReportNumber(row.valorVentaUnitarioSinIgv),
-                  'Valor total sin IGV': formatReportNumber(row.valorVentaTotalSinIgv),
-                  'IGV total': formatReportNumber(row.igvTotal),
-                  'Precio total con IGV': formatReportNumber(row.precioVentaTotalConIgv),
-                  'Diferencia comercial': formatReportNumber(row.diferenciaComercialSinIgv),
-                }
-              : {}),
-          })),
+          rows: groupedTable.rows,
         })
         return
       }
 
-      const data = await reporteInventarioService.getProductosBajoMinimo(pdfFilters)
+      const rows = await fetchAllReportRows((page, size) =>
+        reporteInventarioService.getProductosBajoMinimo({ ...pdfFilters, page, size }),
+      )
       await downloadPdfReport({
+        centerAlignedColumns: ['Almacen'],
+        columnWeights: {
+          almacen: 0.72,
+          'cantidad actual': 0.92,
+          categoria: 1.15,
+          codigo: 1.05,
+          diferencia: 0.88,
+          producto: 2.3,
+          'stock minimo': 0.9,
+        },
         filename: reportFilename(reporte),
         filters: reportFilters(),
         logoSrc: logoBallena,
+        rightAlignedColumns: ['Cantidad actual', 'Stock minimo', 'Diferencia'],
         subtitle: selectedReporte?.description,
+        tableHeaderFontSize: 6.4,
+        tableRowFontSize: 6.4,
+        tableRowHeight: 28,
+        tableRowLineHeight: 8,
+        tableRowMaxLines: 2,
         title: reportTitle,
-        rows: data.content.map((row) => ({
-          Codigo: row.productoCodigo,
-          Producto: row.productoNombre,
-          Categoria: row.categoriaNombre,
-          Almacen: row.almacenNombre,
-          'Cantidad actual': formatReportNumber(row.cantidadActual),
-          'Stock minimo': formatReportNumber(row.stockMinimo),
-          Diferencia: formatReportNumber(row.diferencia),
-        })),
+        rows: rows.map(buildBajoMinimoPdfRow),
       })
     } catch (requestError) {
       setExportError(getReporteInventarioApiErrorMessage(requestError))
@@ -929,34 +1019,6 @@ export function ReportesInventarioPage({
           description={description}
         />
         <div className="flex flex-wrap gap-2">
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
-            disabled={!canExport || isPdfExporting}
-            onClick={handleExportPdf}
-            title={
-              !canExport
-                ? 'No tiene permiso REPORTE_EXPORTAR'
-                : 'Exporta la vista actual usando impresion del navegador'
-            }
-            type="button"
-          >
-            <FileText size={17} />
-            {isPdfExporting ? 'Generando...' : 'PDF informe'}
-          </button>
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
-            disabled={!canExport || isExporting}
-            onClick={handleExportExcel}
-            title={!canExport ? 'No tiene permiso REPORTE_EXPORTAR' : undefined}
-            type="button"
-          >
-            <Download size={17} />
-            {isExporting
-              ? 'Exportando...'
-              : reporte === 'salidas-por-os'
-                ? 'Exportar Excel'
-                : 'Exportar data'}
-          </button>
           <button
             className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
             disabled={activeQuery?.isFetching || resumenQuery.isFetching}
@@ -1019,6 +1081,38 @@ export function ReportesInventarioPage({
         ) : null}
 
         <ReporteInventarioFilters
+          actions={
+            <>
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={!canExport || isPdfExporting}
+                onClick={handleExportPdf}
+                title={
+                  !canExport
+                    ? 'No tiene permiso REPORTE_EXPORTAR'
+                    : 'Exporta la vista actual usando impresion del navegador'
+                }
+                type="button"
+              >
+                <FileText size={17} />
+                {isPdfExporting ? 'Generando...' : 'PDF informe'}
+              </button>
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={!canExport || isExporting}
+                onClick={handleExportExcel}
+                title={!canExport ? 'No tiene permiso REPORTE_EXPORTAR' : undefined}
+                type="button"
+              >
+                <Download size={17} />
+                {isExporting
+                  ? 'Exportando...'
+                  : reporte === 'salidas-por-os'
+                    ? 'Exportar Excel'
+                    : 'Exportar data'}
+              </button>
+            </>
+          }
           almacenId={almacenId}
           almacenes={almacenesQuery.data ?? []}
           estado={estado}

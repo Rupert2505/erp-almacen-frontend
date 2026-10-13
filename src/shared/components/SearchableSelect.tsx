@@ -59,6 +59,7 @@ export function SearchableSelect({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const latestSearchRef = useRef(0)
   const listboxRef = useRef<HTMLDivElement | null>(null)
+  const previousValueRef = useRef<number | null | undefined>(value)
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [options, setOptions] = useState<SearchableSelectOption[]>([])
@@ -142,6 +143,29 @@ export function SearchableSelect({
       window.removeEventListener('scroll', updateDropdownPosition, true)
     }
   }, [isOpen])
+
+  useEffect(() => {
+    const previousValue = previousValueRef.current
+    previousValueRef.current = value
+
+    if (!value) {
+      if (previousValue) {
+        setSelectedOption(null)
+        setQuery('')
+      }
+      return
+    }
+
+    if (selectedOption?.value === value) {
+      return
+    }
+
+    const option = prefetchedOptions.find((item) => item.value === value)
+    if (option && (previousValue !== value || !query.trim())) {
+      setSelectedOption(option)
+      setQuery(option.label)
+    }
+  }, [prefetchedOptions, query, selectedOption?.value, value])
 
   const handleSelect = (option: SearchableSelectOption) => {
     latestSearchRef.current += 1

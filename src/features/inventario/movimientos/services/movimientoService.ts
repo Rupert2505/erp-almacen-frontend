@@ -143,6 +143,14 @@ export const movimientoService = {
     return unwrapApiData<Movimiento>(data)
   },
 
+  async getMovimientoPdf(id: number) {
+    const { data } = await apiClient.get<Blob>(
+      `/api/reportes/inventario/movimientos/${id}/pdf`,
+      { responseType: 'blob' },
+    )
+    return data
+  },
+
   async createMovimiento(payload: MovimientoPayload) {
     const { data } = await apiClient.post('/api/inventario/movimientos', payload)
     return unwrapApiData<Movimiento>(data)

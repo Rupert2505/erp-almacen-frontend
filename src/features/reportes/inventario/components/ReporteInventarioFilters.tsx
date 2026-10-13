@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { Almacen } from '../../../almacenes/types/almacen.types'
 import type { Ubicacion } from '../../../almacenes/types/ubicacion.types'
 import { formatUbicacionLabel } from '../../../almacenes/utils/ubicacionLabels'
@@ -14,8 +15,10 @@ import type { Proveedor } from '../../../proveedores/types/proveedor.types'
 import type { Subfamilia } from '../../../subfamilias/types/subfamilia.types'
 import type { TipoArticulo } from '../../../tipos-articulo/types/tipoArticulo.types'
 import type { ReporteInventarioTipo } from '../types/reporteInventario.types'
+import { reportUsesDateRange } from '../utils/reportDateRange'
 
 type ReporteInventarioFiltersProps = {
+  actions?: ReactNode
   reporte: ReporteInventarioTipo
   productos: Producto[]
   almacenes: Almacen[]
@@ -68,6 +71,7 @@ function selectNumber(value: string) {
 }
 
 export function ReporteInventarioFilters({
+  actions,
   almacenId,
   almacenes,
   estado,
@@ -114,13 +118,7 @@ export function ReporteInventarioFilters({
   ubicacionId,
   ubicaciones,
 }: ReporteInventarioFiltersProps) {
-  const showDates = [
-    'movimientos',
-    'kardex-valorizado',
-    'entradas-proveedor',
-    'salidas-detalle',
-    'salidas-por-os',
-  ].includes(reporte)
+  const showDates = reportUsesDateRange(reporte)
   const showProducto = [
     'movimientos',
     'stock-valorizado',
@@ -425,6 +423,7 @@ export function ReporteInventarioFilters({
       </div>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+        {actions}
         <button
           className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           onClick={onClear}

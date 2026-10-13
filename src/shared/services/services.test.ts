@@ -56,6 +56,13 @@ describe('servicios Axios y respuestas API', () => {
           nombres: 'Admin',
           apellidos: 'ERP',
           email: 'admin@example.com',
+          roles: ['JEFE_ALMACEN'],
+          permisos: [
+            'PERSONAL_VER',
+            'PERSONAL_CREAR',
+            'PERSONAL_EDITAR',
+            'PERSONAL_DESACTIVAR',
+          ],
         },
       },
     })
@@ -68,8 +75,13 @@ describe('servicios Axios y respuestas API', () => {
       nombres: 'Admin',
       apellidos: 'ERP',
       email: 'admin@example.com',
-      roles: [],
-      permisos: [],
+      roles: ['JEFE_ALMACEN'],
+      permisos: [
+        'PERSONAL_VER',
+        'PERSONAL_CREAR',
+        'PERSONAL_EDITAR',
+        'PERSONAL_DESACTIVAR',
+      ],
     })
 
     expect(post).toHaveBeenCalledWith('/api/auth/login', {
@@ -463,6 +475,16 @@ describe('servicios Axios y respuestas API', () => {
     )
   })
 
+  it('movimientoService descarga el PDF del detalle desde el backend', async () => {
+    const pdf = new Blob(['pdf'], { type: 'application/pdf' })
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: pdf })
+
+    await expect(movimientoService.getMovimientoPdf(15)).resolves.toBe(pdf)
+    expect(get).toHaveBeenCalledWith('/api/reportes/inventario/movimientos/15/pdf', {
+      responseType: 'blob',
+    })
+  })
+
   it('movimientoService prioriza mensaje backend en HTTP 409', () => {
     const error = {
       isAxiosError: true,
@@ -740,6 +762,39 @@ describe('servicios Axios y respuestas API', () => {
       }),
       responseType: 'blob',
     })
+
+    await reporteInventarioService.exportMovimientos({
+      page: 0,
+      size: 10,
+      fechaDesde: '2026-08-01',
+      fechaHasta: '2026-08-24',
+      almacenId: 3,
+    })
+
+    expect(get).toHaveBeenCalledWith('/api/reportes/inventario/movimientos/excel', {
+      params: expect.objectContaining({
+        fechaDesde: '2026-08-01',
+        fechaHasta: '2026-08-24',
+        almacenId: 3,
+      }),
+      responseType: 'blob',
+    })
+
+    await reporteInventarioService.exportProductosBajoMinimo({
+      page: 0,
+      size: 10,
+      almacenId: 5,
+    })
+
+    expect(get).toHaveBeenCalledWith(
+      '/api/reportes/inventario/productos-bajo-minimo/excel',
+      {
+        params: expect.objectContaining({
+          almacenId: 5,
+        }),
+        responseType: 'blob',
+      },
+    )
 
     await reporteInventarioService.getMovimientoPdf(15)
 

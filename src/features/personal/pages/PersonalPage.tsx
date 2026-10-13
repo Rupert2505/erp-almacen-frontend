@@ -15,6 +15,7 @@ import {
   PersonalFilters,
   type EstadoPersonalFilter,
 } from '../components/PersonalFilters'
+import { PersonalDetailModal } from '../components/PersonalDetailModal'
 import { PersonalFormModal } from '../components/PersonalFormModal'
 import { PersonalTable } from '../components/PersonalTable'
 import type { PersonalFormValues } from '../schemas/personalSchema'
@@ -69,9 +70,16 @@ export function PersonalPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [viewingPersonal, setViewingPersonal] = useState<Personal | null>(null)
+  const [detailLoadingId, setDetailLoadingId] = useState<number | null>(null)
   const [editLoadingId, setEditLoadingId] = useState<number | null>(null)
 
-  const canManage = can(user, 'USUARIO_ADMIN')
+  const hasLegacyAdminAccess = can(user, 'USUARIO_ADMIN')
+  const canView = can(user, 'PERSONAL_VER') || hasLegacyAdminAccess
+  const canCreate = can(user, 'PERSONAL_CREAR') || hasLegacyAdminAccess
+  const canEdit = can(user, 'PERSONAL_EDITAR') || hasLegacyAdminAccess
+  const canToggle = can(user, 'PERSONAL_DESACTIVAR') || hasLegacyAdminAccess
+  const hasPersonalAccess = canView || canCreate || canEdit || canToggle
 
   const filters = useMemo(
     () => ({
@@ -84,7 +92,7 @@ export function PersonalPage() {
   )
 
   const personalQuery = useQuery({
-    enabled: canManage,
+    enabled: canView,
     queryKey: ['personal', filters],
     queryFn: () => personalService.getPersonal(filters),
   })
@@ -182,6 +190,23 @@ export function PersonalPage() {
     }
   }
 
+  const openDetailModal = async (item: Personal) => {
+    setFeedback(null)
+    setDetailLoadingId(item.id)
+
+    try {
+      const detalle = await personalService.getPersonalById(item.id)
+      setViewingPersonal(detalle)
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: getPersonalApiErrorMessage(error),
+      })
+    } finally {
+      setDetailLoadingId(null)
+    }
+  }
+
   const handleModalClose = () => {
     if (saveMutation.isPending) {
       return
@@ -197,7 +222,7 @@ export function PersonalPage() {
     await personalQuery.refetch()
   }
 
-  if (!canManage) {
+  if (!hasPersonalAccess) {
     return (
       <div>
         <PageHeader
@@ -221,23 +246,27 @@ export function PersonalPage() {
           description="Mantenimiento administrativo del personal."
         />
         <div className="flex flex-wrap gap-2">
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-            disabled={personalQuery.isFetching}
-            onClick={handleRefresh}
-            type="button"
-          >
-            <RefreshCw size={17} />
-            Actualizar
-          </button>
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
-            onClick={openCreateModal}
-            type="button"
-          >
-            <Plus size={17} />
-            Nuevo personal
-          </button>
+          {canView ? (
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              disabled={personalQuery.isFetching}
+              onClick={handleRefresh}
+              type="button"
+            >
+              <RefreshCw size={17} />
+              Actualizar
+            </button>
+          ) : null}
+          {canCreate ? (
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+              onClick={openCreateModal}
+              type="button"
+            >
+              <Plus size={17} />
+              Nuevo personal
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -253,60 +282,84 @@ export function PersonalPage() {
         </div>
       ) : null}
 
-      {personalQuery.isError ? (
+      {canView && personalQuery.isError ? (
         <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {getPersonalApiErrorMessage(personalQuery.error)}
         </div>
       ) : null}
 
-      <Card className="mb-5 p-5">
-        <PersonalFilters
-          estado={estado}
-          onEstadoChange={handleEstadoChange}
-          onTextoChange={handleTextoChange}
-          texto={texto}
-        />
-      </Card>
+      {canView ? (
+        <>
+          <Card className="mb-5 p-5">
+            <PersonalFilters
+              estado={estado}
+              onEstadoChange={handleEstadoChange}
+              onTextoChange={handleTextoChange}
+              texto={texto}
+            />
+          </Card>
 
-      <PersonalTable
-        canManage={canManage}
-        isLoading={personalQuery.isLoading}
-        onActivar={(item) => setConfirmAction({ personal: item, type: 'activar' })}
-        onDesactivar={(item) => setConfirmAction({ personal: item, type: 'desactivar' })}
-        onEdit={openEditModal}
-        personal={personal}
-        toggleLoadingId={toggleMutation.isPending ? confirmAction?.personal.id : editLoadingId}
+          <PersonalTable
+            actionLoadingId={
+              toggleMutation.isPending
+                ? confirmAction?.personal.id
+                : editLoadingId ?? detailLoadingId
+            }
+            canEdit={canEdit}
+            canToggle={canToggle}
+            canViewDetails={canView}
+            isLoading={personalQuery.isLoading}
+            onActivar={(item) => setConfirmAction({ personal: item, type: 'activar' })}
+            onDesactivar={(item) => setConfirmAction({ personal: item, type: 'desactivar' })}
+            onEdit={openEditModal}
+            onView={openDetailModal}
+            personal={personal}
+          />
+
+          <div className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              {totalElements} registro{totalElements === 1 ? '' : 's'} encontrado
+              {totalElements === 1 ? '' : 's'}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={page === 0 || personalQuery.isFetching}
+                onClick={() => setPage((currentPage) => Math.max(currentPage - 1, 0))}
+                type="button"
+              >
+                <ChevronLeft size={16} />
+                Anterior
+              </button>
+              <span className="min-w-28 text-center">
+                Pagina {totalPages === 0 ? 0 : page + 1} de {totalPages}
+              </span>
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={page + 1 >= totalPages || personalQuery.isFetching}
+                onClick={() => setPage((currentPage) => currentPage + 1)}
+                type="button"
+              >
+                Siguiente
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <Card className="p-6">
+          <p className="text-sm text-slate-600">
+            No tiene permiso para listar personal. Puede usar las acciones habilitadas para su
+            cuenta.
+          </p>
+        </Card>
+      )}
+
+      <PersonalDetailModal
+        isOpen={Boolean(viewingPersonal)}
+        onClose={() => setViewingPersonal(null)}
+        personal={viewingPersonal}
       />
-
-      <div className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-        <p>
-          {totalElements} registro{totalElements === 1 ? '' : 's'} encontrado
-          {totalElements === 1 ? '' : 's'}
-        </p>
-        <div className="flex items-center gap-2">
-          <button
-            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={page === 0 || personalQuery.isFetching}
-            onClick={() => setPage((currentPage) => Math.max(currentPage - 1, 0))}
-            type="button"
-          >
-            <ChevronLeft size={16} />
-            Anterior
-          </button>
-          <span className="min-w-28 text-center">
-            Pagina {totalPages === 0 ? 0 : page + 1} de {totalPages}
-          </span>
-          <button
-            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={page + 1 >= totalPages || personalQuery.isFetching}
-            onClick={() => setPage((currentPage) => currentPage + 1)}
-            type="button"
-          >
-            Siguiente
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      </div>
 
       <PersonalFormModal
         errorMessage={formError}

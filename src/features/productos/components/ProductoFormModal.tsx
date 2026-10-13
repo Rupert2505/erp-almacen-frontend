@@ -62,6 +62,9 @@ const textareaClass =
 
 const labelClass = 'mb-2 block text-sm font-medium text-slate-700'
 
+const quickCatalogButtonClass =
+  'grid h-10 w-10 shrink-0 place-items-center rounded-md border border-cyan-300 bg-cyan-50 text-cyan-700 shadow-sm transition-colors hover:border-cyan-400 hover:bg-cyan-100 hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none'
+
 const defaultValues: ProductoFormInput = {
   codigo: null,
   nombre: '',
@@ -456,7 +459,7 @@ export function ProductoFormModal({
                 {canCreateCatalogs ? (
                   <button
                     aria-label="Nueva familia"
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    className={quickCatalogButtonClass}
                     onClick={() => openQuickModal('familia')}
                     title="Nueva familia"
                     type="button"
@@ -490,7 +493,7 @@ export function ProductoFormModal({
                 {canCreateCatalogs ? (
                   <button
                     aria-label="Nueva subfamilia"
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className={quickCatalogButtonClass}
                     disabled={selectedFamiliaId <= 0}
                     onClick={() => openQuickModal('subfamilia')}
                     title={
@@ -530,7 +533,7 @@ export function ProductoFormModal({
                 {canCreateCatalogs ? (
                   <button
                     aria-label="Nueva marca"
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    className={quickCatalogButtonClass}
                     onClick={() => openQuickModal('marca')}
                     title="Nueva marca"
                     type="button"
@@ -562,7 +565,7 @@ export function ProductoFormModal({
                 {canCreateCatalogs ? (
                   <button
                     aria-label="Nuevo tipo de articulo"
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    className={quickCatalogButtonClass}
                     onClick={openQuickTipoArticuloModal}
                     title="Nuevo tipo de articulo"
                     type="button"

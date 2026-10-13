@@ -97,6 +97,7 @@ export const movimientoSchema = z
     ordenTrabajo: z.string().trim().optional(),
     areaSolicitante: z.string().trim().optional(),
     solicitante: z.string().trim().optional(),
+    personalRetiraId: optionalId,
     responsableEntrega: z.string().trim().optional(),
     responsableRecepcion: z.string().trim().optional(),
     guiaSerie: z.string().trim().optional(),
@@ -126,13 +127,9 @@ export const movimientoSchema = z
       'AJUSTE_POSITIVO',
       'AJUSTE_NEGATIVO',
     ].includes(values.tipoMovimiento)
-    const requireObservacion = [
-      'ENTRADA_AJUSTE',
-      'SALIDA_CONSUMO',
-      'SALIDA_AJUSTE',
-      'AJUSTE_POSITIVO',
-      'AJUSTE_NEGATIVO',
-    ].includes(values.tipoMovimiento)
+    const requirePersonalRetira = ['SALIDA_CONSUMO', 'SALIDA_VENTA'].includes(
+      values.tipoMovimiento,
+    )
     const requireDestino = [
       'ENTRADA_COMPRA',
       'ENTRADA_AJUSTE',
@@ -163,11 +160,11 @@ export const movimientoSchema = z
       })
     }
 
-    if (requireObservacion && !values.observacion?.trim()) {
+    if (requirePersonalRetira && !values.personalRetiraId) {
       context.addIssue({
         code: 'custom',
-        message: 'Ingrese la observacion',
-        path: ['observacion'],
+        message: 'Seleccione el personal que retira o solicita',
+        path: ['personalRetiraId'],
       })
     }
 

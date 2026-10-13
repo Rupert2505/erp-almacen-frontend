@@ -33,7 +33,7 @@ export function MovimientoFilters({
           <input
             className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400"
             onChange={(event) => onTextoChange(event.target.value)}
-            placeholder="Numero, producto, documento, proveedor u observacion"
+            placeholder="Numero, producto, documento, proveedor, personal u observacion"
             type="search"
             value={texto}
           />

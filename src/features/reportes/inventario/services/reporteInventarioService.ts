@@ -275,6 +275,10 @@ export const reporteInventarioService = {
     )
   },
 
+  exportMovimientos(filters: ReporteInventarioFilters) {
+    return getBlob('/api/reportes/inventario/movimientos/excel', filters)
+  },
+
   exportStockValorizado(filters: ReporteInventarioFilters) {
     return getBlob('/api/reportes/inventario/stock-valorizado/excel', filters)
   },
@@ -293,6 +297,10 @@ export const reporteInventarioService = {
 
   exportEntradasProveedor(filters: ReporteInventarioFilters) {
     return getBlob('/api/reportes/inventario/entradas-proveedor/excel', filters)
+  },
+
+  exportProductosBajoMinimo(filters: ReporteInventarioFilters) {
+    return getBlob('/api/reportes/inventario/productos-bajo-minimo/excel', filters)
   },
 
   getMovimientoPdf(movimientoId: number) {

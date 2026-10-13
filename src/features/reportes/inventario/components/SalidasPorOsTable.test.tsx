@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type {
   SalidaValorizadaOsResponse,
@@ -84,7 +85,9 @@ const resumen: SalidaValorizadaOsResumenResponse[] = [
 ]
 
 describe('SalidasPorOsTable', () => {
-  it('muestra multiples salidas de una OS, diferencia otras OS y usa el resumen backend', () => {
+  it('agrupa por OS, muestra el resumen compacto y despliega el detalle solicitado', async () => {
+    const user = userEvent.setup()
+
     render(
       <SalidasPorOsTable
         isLoading={false}
@@ -94,21 +97,42 @@ describe('SalidasPorOsTable', () => {
       />,
     )
 
-    expect(screen.getAllByText('OS-001').length).toBeGreaterThanOrEqual(3)
-    expect(screen.getAllByText('OS-002').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText('2 movimiento(s) · 2 item(s)')).toBeInTheDocument()
+    expect(screen.queryByText('Resumen por Orden de Servicio')).not.toBeInTheDocument()
+    expect(screen.getByText('2 mov. - 2 items')).toBeInTheDocument()
+    expect(screen.getByText('S/ 20.00')).toBeInTheDocument()
+    expect(screen.queryByText('MOV-001')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Expandir OS-001' }))
+
+    expect(screen.getByRole('button', { name: 'Contraer OS-001' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    expect(screen.getByText('MOV-001')).toBeInTheDocument()
+    expect(screen.getByText('MOV-002')).toBeInTheDocument()
     expect(screen.getByText('35.00%')).toBeInTheDocument()
     expect(screen.getAllByText('2.00').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Anulado')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Expandir todo' }))
+
     expect(screen.getByText('Anulado')).toBeInTheDocument()
     expect(
       screen.getByText('El valor comercial es inferior al costo de inventario.'),
     ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Contraer todo' }))
+
+    expect(screen.queryByText('MOV-001')).not.toBeInTheDocument()
   })
 
-  it('tolera campos comerciales nulos sin renderizar NaN ni undefined', () => {
+  it('tolera campos comerciales nulos sin renderizar NaN ni undefined', async () => {
+    const user = userEvent.setup()
     const { container } = render(
       <SalidasPorOsTable isLoading={false} resumenPorOs={[]} rows={[rows[1]]} showCosts />,
     )
+
+    await user.click(screen.getByRole('button', { name: 'Expandir OS-001' }))
 
     expect(container).not.toHaveTextContent('NaN')
     expect(container).not.toHaveTextContent('undefined')

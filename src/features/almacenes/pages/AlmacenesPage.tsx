@@ -71,7 +71,9 @@ export function AlmacenesPage() {
   const [editLoadingId, setEditLoadingId] = useState<number | null>(null)
 
   const canView = can(user, 'ALMACEN_VER')
-  const canManage = can(user, 'USUARIO_ADMIN')
+  const canCreate = can(user, 'ALMACEN_CREAR')
+  const canEdit = can(user, 'ALMACEN_EDITAR')
+  const canToggle = can(user, 'ALMACEN_DESACTIVAR')
 
   const filters = useMemo(
     () => ({
@@ -231,7 +233,7 @@ export function AlmacenesPage() {
             <RefreshCw size={17} />
             Actualizar
           </button>
-          {canManage ? (
+          {canCreate ? (
             <button
               className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
               onClick={openCreateModal}
@@ -272,14 +274,15 @@ export function AlmacenesPage() {
       </Card>
 
       <AlmacenTable
+        actionLoadingId={toggleMutation.isPending ? confirmAction?.almacen.id : editLoadingId}
         almacenes={almacenes}
-        canManage={canManage}
+        canEdit={canEdit}
+        canToggle={canToggle}
         isLoading={almacenesQuery.isLoading}
         onActivar={(almacen) => setConfirmAction({ almacen, type: 'activar' })}
         onDesactivar={(almacen) => setConfirmAction({ almacen, type: 'desactivar' })}
         onEdit={openEditModal}
         onVerUbicaciones={(almacen) => navigate(`/ubicaciones?almacenId=${almacen.id}`)}
-        toggleLoadingId={toggleMutation.isPending ? confirmAction?.almacen.id : editLoadingId}
       />
 
       <div className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">

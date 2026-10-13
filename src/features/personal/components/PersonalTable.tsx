@@ -1,24 +1,30 @@
-import { CheckCircle2, Edit, PowerOff } from 'lucide-react'
+import { CheckCircle2, Edit, Eye, PowerOff } from 'lucide-react'
 import type { Personal } from '../types/personal.types'
 
 type PersonalTableProps = {
   personal: Personal[]
-  canManage: boolean
+  canEdit: boolean
+  canToggle: boolean
+  canViewDetails: boolean
   isLoading: boolean
-  toggleLoadingId?: number | null
+  actionLoadingId?: number | null
   onActivar: (personal: Personal) => void
   onDesactivar: (personal: Personal) => void
   onEdit: (personal: Personal) => void
+  onView: (personal: Personal) => void
 }
 
 export function PersonalTable({
-  canManage,
+  actionLoadingId,
+  canEdit,
+  canToggle,
+  canViewDetails,
   isLoading,
   onActivar,
   onDesactivar,
   onEdit,
+  onView,
   personal,
-  toggleLoadingId,
 }: PersonalTableProps) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -56,7 +62,7 @@ export function PersonalTable({
 
             {!isLoading
               ? personal.map((item) => {
-                  const isToggleLoading = toggleLoadingId === item.id
+                  const isActionLoading = actionLoadingId === item.id
 
                   return (
                     <tr className="hover:bg-cyan-50/40" key={item.id}>
@@ -92,9 +98,22 @@ export function PersonalTable({
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex justify-end gap-2">
-                          {canManage ? (
+                          {canViewDetails ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
+                              disabled={isActionLoading}
+                              onClick={() => onView(item)}
+                              type="button"
+                            >
+                              <Eye size={16} />
+                              Ver
+                            </button>
+                          ) : null}
+
+                          {canEdit ? (
+                            <button
+                              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-cyan-50/40"
+                              disabled={isActionLoading}
                               onClick={() => onEdit(item)}
                               type="button"
                             >
@@ -103,10 +122,10 @@ export function PersonalTable({
                             </button>
                           ) : null}
 
-                          {canManage && item.activo ? (
+                          {canToggle && item.activo ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
-                              disabled={isToggleLoading}
+                              disabled={isActionLoading}
                               onClick={() => onDesactivar(item)}
                               type="button"
                             >
@@ -115,10 +134,10 @@ export function PersonalTable({
                             </button>
                           ) : null}
 
-                          {canManage && !item.activo ? (
+                          {canToggle && !item.activo ? (
                             <button
                               className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-200 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                              disabled={isToggleLoading}
+                              disabled={isActionLoading}
                               onClick={() => onActivar(item)}
                               type="button"
                             >

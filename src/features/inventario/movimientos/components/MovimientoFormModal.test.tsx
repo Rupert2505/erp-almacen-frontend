@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { type ComponentProps, useState } from 'react'
+import { type ComponentProps, type ReactNode, useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { personalService } from '../../../personal/services/personalService'
 import { productoService } from '../../../productos/services/productoService'
 import { proveedorService } from '../../../proveedores/services/proveedorService'
 import { stockService } from '../../stock/services/stockService'
@@ -17,6 +19,14 @@ vi.mock('../../../proveedores/services/proveedorService', () => ({
   proveedorService: {
     getProveedores: vi.fn(),
   },
+}))
+
+vi.mock('../../../personal/services/personalService', () => ({
+  personalService: {
+    createPersonal: vi.fn(),
+    getPersonal: vi.fn(),
+  },
+  getPersonalApiErrorMessage: vi.fn(() => 'No se pudo guardar el personal.'),
 }))
 
 vi.mock('../../stock/services/stockService', () => ({
@@ -52,6 +62,21 @@ const proveedores = [
     razonSocial: 'Proveedor Acme',
     nombreComercial: 'Acme',
     direccion: null,
+    telefono: null,
+    email: null,
+    activo: true,
+  },
+]
+
+const personal = [
+  {
+    id: 40,
+    tipoDocumento: 'DNI',
+    numeroDocumento: '76543210',
+    nombres: 'Juan',
+    apellidos: 'Perez',
+    cargo: 'Tecnico',
+    area: 'Operaciones',
     telefono: null,
     email: null,
     activo: true,
@@ -97,14 +122,26 @@ const ubicaciones = [
   },
 ]
 
+function renderWithClient(ui: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      mutations: { retry: false },
+      queries: { retry: false },
+    },
+  })
+
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+}
+
 function renderModal(onSubmit = vi.fn().mockResolvedValue(undefined)) {
-  render(
+  renderWithClient(
     <MovimientoFormModal
       almacenes={almacenes}
       isOpen
       isSaving={false}
       onClose={vi.fn()}
       onSubmit={onSubmit}
+      personal={personal}
       productos={productos}
       proveedores={proveedores}
       ubicaciones={ubicaciones}
@@ -130,6 +167,7 @@ function ToggleMovimientoModal({ onSubmit }: { onSubmit: MovimientoFormModalProp
         isSaving={false}
         onClose={() => setIsOpen(false)}
         onSubmit={onSubmit}
+        personal={personal}
         productos={productos}
         proveedores={proveedores}
         ubicaciones={ubicaciones}
@@ -160,6 +198,7 @@ function StockErrorMovimientoModal({
           throw error
         }
       }}
+      personal={personal}
       productos={productos}
       proveedores={proveedores}
       ubicaciones={ubicaciones}
@@ -177,6 +216,11 @@ async function selectProveedorAndProducto() {
   await user.click(await screen.findByText('P-001 - Producto prueba'))
 
   return user
+}
+
+async function selectPersonal(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByPlaceholderText('Buscar personal'), 'Juan')
+  await user.click(await screen.findByText('76543210 - Juan Perez'))
 }
 
 async function fillEntradaCompraBasica() {
@@ -205,6 +249,20 @@ describe('MovimientoFormModal', () => {
       totalPages: 1,
       number: 0,
       size: 10,
+    })
+    vi.mocked(personalService.getPersonal).mockResolvedValue({
+      content: personal,
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 10,
+    })
+    vi.mocked(personalService.createPersonal).mockResolvedValue({
+      ...personal[0],
+      id: 41,
+      numeroDocumento: '70112233',
+      nombres: 'Maria',
+      apellidos: 'Ramos',
     })
     vi.mocked(stockService.getStock).mockResolvedValue({
       content: [],
@@ -376,7 +434,7 @@ describe('MovimientoFormModal', () => {
 
   it('inicia con una sola linea y resetea detalles al cerrar y reabrir', async () => {
     const user = userEvent.setup()
-    render(<ToggleMovimientoModal onSubmit={vi.fn().mockResolvedValue(undefined)} />)
+    renderWithClient(<ToggleMovimientoModal onSubmit={vi.fn().mockResolvedValue(undefined)} />)
 
     expect(screen.getByText('Lineas:').parentElement).toHaveTextContent('Lineas: 1')
 
@@ -436,7 +494,7 @@ describe('MovimientoFormModal', () => {
     expect(screen.getByLabelText('Almacen destino')).toBeInTheDocument()
     expect(screen.queryByLabelText('Almacen origen')).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Motivo movimiento/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/Orden trabajo/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Orden de Servicio/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Responsable entrega/i)).not.toBeInTheDocument()
   })
 
@@ -450,12 +508,50 @@ describe('MovimientoFormModal', () => {
     expect(screen.getByText('Datos complementarios')).toBeInTheDocument()
     expect(screen.getByLabelText('Almacen origen')).toBeInTheDocument()
     expect(screen.getByLabelText('Motivo movimiento')).toBeInTheDocument()
-    expect(screen.getByLabelText('Observacion')).toBeInTheDocument()
-    expect(screen.getByLabelText('Orden trabajo (opcional)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Observacion (opcional)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Orden de Servicio (OS) (opcional)')).toHaveAttribute(
+      'placeholder',
+      'Ej. OS-002541',
+    )
     expect(screen.getByLabelText('Area solicitante (opcional)')).toBeInTheDocument()
-    expect(screen.getByLabelText('Solicitante (opcional)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Personal que retira/solicita')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Nuevo personal que retira o solicita' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText('Solicitante (opcional)')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Almacen destino')).not.toBeInTheDocument()
     expect(screen.queryByText('Valorizacion comercial')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Obligatoria para guardar la salida de venta, incluso como borrador.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('permite crear personal desde el boton rapido y lo deja seleccionado', async () => {
+    renderModal()
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_CONSUMO')
+    await user.click(screen.getByRole('button', { name: 'Nuevo personal que retira o solicita' }))
+
+    expect(screen.getByRole('heading', { name: 'Nuevo personal' })).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Numero documento'), '70112233')
+    await user.type(screen.getByLabelText('Nombres'), 'Maria')
+    await user.type(screen.getByLabelText('Apellidos'), 'Ramos')
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => {
+      expect(personalService.createPersonal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apellidos: 'RAMOS',
+          nombres: 'MARIA',
+          numeroDocumento: '70112233',
+          tipoDocumento: 'DNI',
+        }),
+      )
+    })
+    expect(await screen.findByText('Personal creado y seleccionado correctamente.')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Buscar personal')).toHaveValue('70112233 - Maria Ramos')
   })
 
   it('SALIDA_VENTA muestra OS y opciones de recargo comercial', async () => {
@@ -464,6 +560,7 @@ describe('MovimientoFormModal', () => {
 
     await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
 
+    expect(screen.getByLabelText('Personal que retira/solicita')).toBeInTheDocument()
     expect(screen.getByLabelText('Orden de Servicio (OS)')).toHaveAttribute(
       'placeholder',
       'Ej. OS-002541',
@@ -511,6 +608,7 @@ describe('MovimientoFormModal', () => {
     await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
     await user.type(screen.getByLabelText('Orden de Servicio (OS)'), 'OS-TEST-001')
     await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
+    await selectPersonal(user)
     await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
     await user.click(await screen.findByText('P-001 - Producto prueba'))
     await user.selectOptions(screen.getByLabelText('Recargo comercial linea 1'), '35')
@@ -532,6 +630,7 @@ describe('MovimientoFormModal', () => {
         expect.objectContaining({
           confirmar: true,
           ordenTrabajo: 'OS-TEST-001',
+          personalRetiraId: 40,
           tipoMovimiento: 'SALIDA_VENTA',
           detalles: [
             expect.objectContaining({
@@ -547,7 +646,7 @@ describe('MovimientoFormModal', () => {
 
   it('cierra la confirmacion y muestra el error sin perder los datos del formulario', async () => {
     const onSubmit = vi.fn().mockRejectedValue(new Error('Stock insuficiente'))
-    render(<StockErrorMovimientoModal onSubmit={onSubmit} />)
+    renderWithClient(<StockErrorMovimientoModal onSubmit={onSubmit} />)
     const user = await fillEntradaCompraBasica()
 
     await user.click(screen.getByRole('button', { name: 'Guardar y confirmar' }))
@@ -627,6 +726,7 @@ describe('MovimientoFormModal', () => {
     await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
     await user.type(screen.getByLabelText('Orden de Servicio (OS)'), 'OS-BORRADOR')
     await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
+    await selectPersonal(user)
     await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
     await user.click(await screen.findByText('P-001 - Producto prueba'))
 
@@ -708,6 +808,7 @@ describe('MovimientoFormModal', () => {
     await user.selectOptions(screen.getByLabelText('Tipo movimiento'), 'SALIDA_VENTA')
     await user.type(screen.getByLabelText('Orden de Servicio (OS)'), 'OS-BORRADOR')
     await user.selectOptions(screen.getByLabelText('Almacen origen'), '1')
+    await selectPersonal(user)
     await user.type(screen.getByPlaceholderText('Buscar producto'), 'P-001')
     await user.click(await screen.findByText('P-001 - Producto prueba'))
 
@@ -732,6 +833,7 @@ describe('MovimientoFormModal', () => {
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
+          personalRetiraId: 40,
           tipoMovimiento: 'SALIDA_VENTA',
           detalles: expect.arrayContaining([
             expect.objectContaining({
@@ -862,7 +964,7 @@ describe('MovimientoFormModal', () => {
     expect(screen.getByLabelText('Almacen destino')).toBeInTheDocument()
     expect(screen.queryByLabelText('Almacen origen')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Motivo movimiento')).toBeInTheDocument()
-    expect(screen.getByLabelText('Observacion')).toBeInTheDocument()
+    expect(screen.getByLabelText('Observacion (opcional)')).toBeInTheDocument()
   })
 
   it('AJUSTE_NEGATIVO muestra solo origen operativo', async () => {
@@ -874,7 +976,7 @@ describe('MovimientoFormModal', () => {
     expect(screen.getByLabelText('Almacen origen')).toBeInTheDocument()
     expect(screen.queryByLabelText('Almacen destino')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Motivo movimiento')).toBeInTheDocument()
-    expect(screen.getByLabelText('Observacion')).toBeInTheDocument()
+    expect(screen.getByLabelText('Observacion (opcional)')).toBeInTheDocument()
   })
 
   it('cambiar tipo reinicia todos los datos aunque los campos coincidan', async () => {
@@ -901,7 +1003,7 @@ describe('MovimientoFormModal', () => {
     expect(screen.getByLabelText('Tipo movimiento')).toHaveValue('ENTRADA_AJUSTE')
     expect(screen.getByLabelText('Proveedor')).toHaveValue('')
     expect(screen.getByLabelText('Almacen destino')).toHaveValue('')
-    expect(screen.getByLabelText('Observacion')).toHaveValue('')
+    expect(screen.getByLabelText('Observacion (opcional)')).toHaveValue('')
     expect(screen.getByPlaceholderText('Buscar producto')).toHaveValue('')
     expect(screen.getByLabelText('Cantidad linea 1')).toHaveValue(1)
     expect(screen.getByText('Lineas:').parentElement).toHaveTextContent('Lineas: 1')
@@ -917,7 +1019,7 @@ describe('MovimientoFormModal', () => {
 
     expect(await screen.findByText('Seleccione un almacen destino')).toBeInTheDocument()
     expect(screen.getByText('Ingrese el motivo del movimiento')).toBeInTheDocument()
-    expect(screen.getByText('Ingrese la observacion')).toBeInTheDocument()
+    expect(screen.queryByText('Ingrese la observacion')).not.toBeInTheDocument()
   })
 
   it('valida coherencia de guia y comprobante', async () => {
@@ -1014,13 +1116,14 @@ describe('MovimientoFormModal', () => {
 
     vi.mocked(productoService.getProductos).mockImplementation(() => pendingSearch)
 
-    render(
+    renderWithClient(
       <MovimientoFormModal
         almacenes={almacenes}
         isOpen
         isSaving={false}
         onClose={vi.fn()}
         onSubmit={vi.fn().mockResolvedValue(undefined)}
+        personal={personal}
         productos={[productoManguera, productoPegamento]}
         proveedores={proveedores}
         ubicaciones={ubicaciones}

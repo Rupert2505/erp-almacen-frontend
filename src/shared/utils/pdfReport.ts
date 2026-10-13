@@ -1,14 +1,29 @@
 import { downloadBlob, openPdf } from './downloads'
 
+export type PdfReportRowKind = 'detail' | 'group' | 'spacer' | 'subtotal'
+
 type PdfReportOptions = {
+  centerAlignedColumns?: string[]
+  columnWeights?: Record<string, number>
   filename: string
   filters: Array<[string, string | number | boolean | null | undefined]>
   infoColumns?: number
   infoMaxItems?: number
   infoTitle?: string
   logoSrc: string
+  recordCount?: number
+  rightAlignedColumns?: string[]
+  rowKinds?: PdfReportRowKind[]
   rows: Array<Record<string, unknown>>
   subtitle?: string
+  summary?: Array<[string, string | number | boolean | null | undefined]>
+  summaryColumns?: number
+  summaryTitle?: string
+  tableHeaderFontSize?: number
+  tableRowFontSize?: number
+  tableRowHeight?: number
+  tableRowLineHeight?: number
+  tableRowMaxLines?: number
   title: string
 }
 
@@ -18,12 +33,127 @@ type RenderedPage = {
   width: number
 }
 
+type PaginatedPdfRow<T> = {
+  height: number
+  kind: PdfReportRowKind
+  row: T
+}
+
+type PaginatePdfRowsOptions = {
+  firstPageHeight: number
+  nextPageHeight: number
+  rowHeight: number
+}
+
 const A4_PAGE = {
   height: 842,
   width: 595,
 }
 
 const SCALE = 2
+
+function pdfRowHeight(kind: PdfReportRowKind, rowHeight: number) {
+  if (kind === 'group') {
+    return 26
+  }
+
+  if (kind === 'spacer') {
+    return 10
+  }
+
+  if (kind === 'subtotal') {
+    return Math.max(24, rowHeight - 8)
+  }
+
+  return rowHeight
+}
+
+export function paginatePdfTableRows<T>(
+  rows: T[],
+  rowKinds: PdfReportRowKind[],
+  { firstPageHeight, nextPageHeight, rowHeight }: PaginatePdfRowsOptions,
+) {
+  const pages: Array<Array<PaginatedPdfRow<T>>> = []
+  let cursor = 0
+  let currentGroup: PaginatedPdfRow<T> | null = null
+
+  while (cursor < rows.length) {
+    while ((rowKinds[cursor] ?? 'detail') === 'spacer') {
+      cursor += 1
+    }
+
+    if (cursor >= rows.length) {
+      break
+    }
+
+    const availableHeight = pages.length === 0 ? firstPageHeight : nextPageHeight
+    const page: Array<PaginatedPdfRow<T>> = []
+    let usedHeight = 0
+    const firstKind = rowKinds[cursor] ?? 'detail'
+
+    if (firstKind !== 'group' && currentGroup) {
+      page.push(currentGroup)
+      usedHeight += currentGroup.height
+    }
+
+    while (cursor < rows.length) {
+      const kind = rowKinds[cursor] ?? 'detail'
+      const height = pdfRowHeight(kind, rowHeight)
+
+      if (kind === 'spacer') {
+        const nextKind = rowKinds[cursor + 1] ?? 'detail'
+        const nextHeight = pdfRowHeight(nextKind, rowHeight)
+        const followingHeight =
+          nextKind === 'group' && cursor + 2 < rows.length
+            ? pdfRowHeight(rowKinds[cursor + 2] ?? 'detail', rowHeight)
+            : 0
+
+        if (usedHeight + height + nextHeight + followingHeight > availableHeight) {
+          break
+        }
+      }
+
+      if (kind === 'group' && page.length > 0) {
+        const followingHeight =
+          cursor + 1 < rows.length
+            ? pdfRowHeight(rowKinds[cursor + 1] ?? 'detail', rowHeight)
+            : 0
+
+        if (usedHeight + height + followingHeight > availableHeight) {
+          break
+        }
+      }
+
+      if (usedHeight + height > availableHeight && page.length > 0) {
+        break
+      }
+
+      const entry = { height, kind, row: rows[cursor] }
+      page.push(entry)
+      usedHeight += height
+      cursor += 1
+
+      if (kind === 'group') {
+        currentGroup = entry
+      }
+    }
+
+    if (page.length === 0) {
+      const kind = rowKinds[cursor] ?? 'detail'
+      const entry = { height: pdfRowHeight(kind, rowHeight), kind, row: rows[cursor] }
+      page.push(entry)
+      cursor += 1
+
+      if (kind === 'group') {
+        currentGroup = entry
+      }
+    }
+
+    pages.push(page)
+  }
+
+  return pages
+}
 
 function textValue(value: unknown) {
   return String(value ?? '').trim()
@@ -134,11 +264,11 @@ function sanitizePdfText(value: string) {
     .replace(/[^\x20-\x7E]/g, '')
 }
 
-function makePageCanvas() {
+function makePageCanvas(pageSize: { height: number; width: number }) {
   const canvas = document.createElement('canvas')
 
-  canvas.width = A4_PAGE.width * SCALE
-  canvas.height = A4_PAGE.height * SCALE
+  canvas.width = pageSize.width * SCALE
+  canvas.height = pageSize.height * SCALE
 
   const context = canvas.getContext('2d')
 
@@ -148,12 +278,16 @@ function makePageCanvas() {
 
   context.scale(SCALE, SCALE)
   context.fillStyle = '#ffffff'
-  context.fillRect(0, 0, A4_PAGE.width, A4_PAGE.height)
+  context.fillRect(0, 0, pageSize.width, pageSize.height)
 
   return { canvas, context }
 }
 
-function columnWidths(columns: string[], contentWidth: number) {
+function columnWidths(
+  columns: string[],
+  contentWidth: number,
+  customWeights: Record<string, number> = {},
+) {
   const explicitWeights: Record<string, number> = {
     'almacen destino': 1.4,
     'almacen origen': 1.4,
@@ -187,7 +321,7 @@ function columnWidths(columns: string[], contentWidth: number) {
   const maxLabel = Math.max(...columns.map((column) => column.length), 1)
   const weighted = columns.map((column) => {
     const lowerColumn = column.toLowerCase()
-    const explicitWeight = explicitWeights[lowerColumn]
+    const explicitWeight = customWeights[lowerColumn] ?? explicitWeights[lowerColumn]
 
     if (explicitWeight) {
       return explicitWeight * 72
@@ -211,23 +345,41 @@ function columnWidths(columns: string[], contentWidth: number) {
 }
 
 function renderPdfReportPages({
+  centerAlignedColumns = [],
+  columnWeights,
   filters,
   infoColumns = 2,
   infoMaxItems = 8,
   infoTitle = 'Filtros aplicados',
   logo,
+  recordCount,
+  rightAlignedColumns = [],
+  rowKinds = [],
   rows,
   subtitle,
+  summary = [],
+  summaryColumns = 3,
+  summaryTitle = 'Resumen',
+  tableHeaderFontSize,
+  tableRowFontSize,
+  tableRowHeight,
+  tableRowLineHeight,
+  tableRowMaxLines,
   title,
 }: PdfReportOptions & { logo: HTMLImageElement | null }) {
   const pages: RenderedPage[] = []
+  const pageSize = A4_PAGE
   const columns = rows.length > 0 ? Object.keys(rows[0]) : ['Mensaje']
   const safeRows = rows.length > 0 ? rows : [{ Mensaje: 'No hay datos para los filtros seleccionados.' }]
-  const margin = 28
-  const contentWidth = A4_PAGE.width - margin * 2
-  const widths = columnWidths(columns, contentWidth)
+  const safeRowKinds = safeRows.map((_, index) => rowKinds[index] ?? 'detail')
+  const margin = 14
+  const contentWidth = pageSize.width - margin * 2
+  const widths = columnWidths(columns, contentWidth, columnWeights)
+  const centered = new Set(centerAlignedColumns.map((column) => column.toLowerCase()))
+  const rightAligned = new Set(rightAlignedColumns.map((column) => column.toLowerCase()))
   const headerHeight = 118
   const filterRows = activeFilters(filters)
+  const summaryRows = activeFilters(summary)
   const filterColumns = Math.max(1, infoColumns)
   const visibleFilterRows = filterRows.slice(0, infoMaxItems)
   const filterHeight = Math.min(
@@ -236,24 +388,40 @@ function renderPdfReportPages({
       ? Math.ceil(visibleFilterRows.length / filterColumns) * 26 + 34
       : 40,
   )
-  const tableTop = headerHeight + filterHeight + 14
+  const summaryTop = headerHeight + filterHeight + 14
+  const resolvedSummaryColumns = Math.max(1, Math.min(summaryColumns, summaryRows.length || 1))
+  const summaryHeight =
+    summaryRows.length > 0
+      ? 30 + Math.ceil(summaryRows.length / resolvedSummaryColumns) * 30
+      : 0
+  const tableTop = summaryRows.length > 0 ? summaryTop + summaryHeight + 14 : summaryTop
   const tableHeaderHeight = 34
-  const rowHeight = columns.length > 9 ? 38 : 42
-  const footerTop = A4_PAGE.height - 26
-  const rowsPerPage = Math.max(1, Math.floor((footerTop - tableTop - tableHeaderHeight) / rowHeight))
+  const tableCellPadding = columns.length > 9 ? 3 : 5
+  const rowHeight = tableRowHeight ?? (columns.length > 9 ? 38 : 42)
+  const resolvedHeaderFontSize = tableHeaderFontSize ?? 6.8
+  const resolvedRowFontSize = tableRowFontSize ?? (columns.length > 9 ? 6.2 : 7)
+  const resolvedRowLineHeight = tableRowLineHeight ?? (columns.length > 9 ? 8.5 : 9.5)
+  const resolvedRowMaxLines = tableRowMaxLines ?? 3
+  const footerTop = pageSize.height - 26
+  const nextPageTableTop = summaryTop
+  const pageRows = paginatePdfTableRows(safeRows, safeRowKinds, {
+    firstPageHeight: footerTop - tableTop - tableHeaderHeight,
+    nextPageHeight: footerTop - nextPageTableTop - tableHeaderHeight,
+    rowHeight,
+  })
   const generatedAt = new Date().toLocaleString('es-PE')
-  const totalPages = Math.max(1, Math.ceil(safeRows.length / rowsPerPage))
+  const totalPages = pageRows.length
 
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
-    const { canvas, context } = makePageCanvas()
-    const pageRows = safeRows.slice(pageIndex * rowsPerPage, pageIndex * rowsPerPage + rowsPerPage)
+    const { canvas, context } = makePageCanvas(pageSize)
+    const currentPageRows = pageRows[pageIndex]
 
     context.fillStyle = '#ffffff'
-    context.fillRect(0, 0, A4_PAGE.width, 86)
+    context.fillRect(0, 0, pageSize.width, 86)
     context.strokeStyle = '#cbd5e1'
     context.beginPath()
     context.moveTo(0, 84)
-    context.lineTo(A4_PAGE.width, 84)
+    context.lineTo(pageSize.width, 84)
     context.stroke()
 
     if (logo) {
@@ -282,12 +450,12 @@ function renderPdfReportPages({
       maxLines: 1,
       maxWidth: 310,
     })
-    drawText(context, `Generado: ${generatedAt}`, A4_PAGE.width - margin, 22, {
+    drawText(context, `Generado: ${generatedAt}`, pageSize.width - margin, 22, {
       align: 'right',
       color: '#334155',
       font: '8.5px Arial',
     })
-    drawText(context, `Registros: ${safeRows.length}`, A4_PAGE.width - margin, 40, {
+    drawText(context, `Registros: ${recordCount ?? rows.length}`, pageSize.width - margin, 40, {
       align: 'right',
       color: '#334155',
       font: '8.5px Arial',
@@ -329,8 +497,62 @@ function renderPdfReportPages({
       })
     }
 
-    let y = tableTop
+    if (summaryRows.length > 0 && pageIndex === 0) {
+      context.fillStyle = '#ecfeff'
+      context.fillRect(margin, summaryTop, contentWidth, summaryHeight)
+      context.strokeStyle = '#67e8f9'
+      context.strokeRect(margin, summaryTop, contentWidth, summaryHeight)
+      drawText(context, summaryTitle, margin + 12, summaryTop + 9, {
+        color: '#155e75',
+        font: 'bold 9px Arial',
+      })
+
+      summaryRows.forEach(([label, value], index) => {
+        const column = index % resolvedSummaryColumns
+        const row = Math.floor(index / resolvedSummaryColumns)
+        const columnWidth = contentWidth / resolvedSummaryColumns
+        const x = margin + 12 + column * columnWidth
+        const y = summaryTop + 27 + row * 30
+
+        drawText(context, `${label}:`, x, y, {
+          color: '#64748b',
+          font: 'bold 7px Arial',
+          maxLines: 1,
+          maxWidth: columnWidth - 20,
+        })
+        drawText(context, textValue(value), x, y + 11, {
+          color: '#0f172a',
+          font: 'bold 10px Arial',
+          maxLines: 1,
+          maxWidth: columnWidth - 20,
+        })
+      })
+    }
+
+    let y = pageIndex === 0 ? tableTop : nextPageTableTop
     let x = margin
+    const leadingGroup = currentPageRows[0]?.kind === 'group' ? currentPageRows[0] : null
+    const rowsAfterHeader = leadingGroup ? currentPageRows.slice(1) : currentPageRows
+    const drawGroupRow = (row: Record<string, unknown>, groupY: number, groupHeight: number) => {
+      context.fillStyle = '#e0f2fe'
+      context.fillRect(margin, groupY, contentWidth, groupHeight)
+      context.strokeStyle = '#7dd3fc'
+      context.strokeRect(margin, groupY, contentWidth, groupHeight)
+
+      const groupLabel = columns.map((column) => textValue(row[column])).find(Boolean) ?? ''
+      drawText(context, groupLabel, margin + 9, groupY + 6, {
+        color: '#075985',
+        font: `bold ${Math.max(resolvedRowFontSize + 0.8, 7)}px Arial`,
+        maxLines: 2,
+        maxWidth: contentWidth - 18,
+        rowHeight: resolvedRowLineHeight,
+      })
+    }
+
+    if (leadingGroup) {
+      drawGroupRow(leadingGroup.row, y, leadingGroup.height)
+      y += leadingGroup.height
+    }
 
     context.fillStyle = '#f1f5f9'
     context.fillRect(margin, y, contentWidth, tableHeaderHeight)
@@ -338,11 +560,25 @@ function renderPdfReportPages({
     context.strokeRect(margin, y, contentWidth, tableHeaderHeight)
 
     columns.forEach((column, index) => {
-      drawText(context, column.toUpperCase(), x + 5, y + 8, {
+      const normalizedColumn = column.toLowerCase()
+      const align = rightAligned.has(normalizedColumn)
+        ? 'right'
+        : centered.has(normalizedColumn)
+          ? 'center'
+          : 'left'
+      const textX =
+        align === 'right'
+          ? x + widths[index] - tableCellPadding
+          : align === 'center'
+            ? x + widths[index] / 2
+            : x + tableCellPadding
+
+      drawText(context, column.toUpperCase(), textX, y + 8, {
+        align,
         color: '#334155',
-        font: 'bold 6.8px Arial',
+        font: `bold ${resolvedHeaderFontSize}px Arial`,
         maxLines: 2,
-        maxWidth: widths[index] - 10,
+        maxWidth: widths[index] - tableCellPadding * 2,
         rowHeight: 9,
       })
       x += widths[index]
@@ -350,45 +586,71 @@ function renderPdfReportPages({
 
     y += tableHeaderHeight
 
-    pageRows.forEach((row, rowIndex) => {
+    rowsAfterHeader.forEach(({ height: currentRowHeight, kind: rowKind, row }, rowIndex) => {
       x = margin
-      context.fillStyle = rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc'
-      context.fillRect(margin, y, contentWidth, rowHeight)
-      context.strokeStyle = '#e2e8f0'
-      context.strokeRect(margin, y, contentWidth, rowHeight)
+
+      if (rowKind === 'spacer') {
+        y += currentRowHeight
+        return
+      }
+
+      context.fillStyle =
+        rowKind === 'group'
+          ? '#e0f2fe'
+          : rowKind === 'subtotal'
+            ? '#fefce8'
+            : rowIndex % 2 === 0
+              ? '#ffffff'
+              : '#f8fafc'
+      context.fillRect(margin, y, contentWidth, currentRowHeight)
+      context.strokeStyle = rowKind === 'group' ? '#7dd3fc' : '#e2e8f0'
+      context.strokeRect(margin, y, contentWidth, currentRowHeight)
+
+      if (rowKind === 'group') {
+        drawGroupRow(row, y, currentRowHeight)
+        y += currentRowHeight
+        return
+      }
 
       columns.forEach((column, columnIndex) => {
         const value = textValue(row[column])
-        drawText(context, value || '-', x + 5, y + 7, {
+        const normalizedColumn = column.toLowerCase()
+        const align = rightAligned.has(normalizedColumn)
+          ? 'right'
+          : centered.has(normalizedColumn)
+            ? 'center'
+            : 'left'
+        const textX =
+          align === 'right'
+            ? x + widths[columnIndex] - tableCellPadding
+            : align === 'center'
+              ? x + widths[columnIndex] / 2
+              : x + tableCellPadding
+
+        drawText(context, value || (rowKind === 'subtotal' ? '' : '-'), textX, y + 7, {
+          align,
           color: columnIndex === 0 ? '#0f172a' : '#334155',
-          font:
-            columnIndex === 0
-              ? columns.length > 9
-                ? 'bold 6.2px Arial'
-                : 'bold 7px Arial'
-              : columns.length > 9
-                ? '6.2px Arial'
-                : '7px Arial',
-          maxLines: 3,
-          maxWidth: widths[columnIndex] - 10,
-          rowHeight: columns.length > 9 ? 8.5 : 9.5,
+          font: `${columnIndex === 0 || rowKind === 'subtotal' ? 'bold ' : ''}${resolvedRowFontSize}px Arial`,
+          maxLines: resolvedRowMaxLines,
+          maxWidth: widths[columnIndex] - tableCellPadding * 2,
+          rowHeight: resolvedRowLineHeight,
         })
         x += widths[columnIndex]
       })
 
-      y += rowHeight
+      y += currentRowHeight
     })
 
     context.strokeStyle = '#cbd5e1'
     context.beginPath()
     context.moveTo(margin, footerTop - 7)
-    context.lineTo(A4_PAGE.width - margin, footerTop - 7)
+    context.lineTo(pageSize.width - margin, footerTop - 7)
     context.stroke()
     drawText(context, 'Informe generado desde ERP Almacen', margin, footerTop, {
       color: '#64748b',
       font: '8px Arial',
     })
-    drawText(context, `Pagina ${pageIndex + 1} de ${totalPages}`, A4_PAGE.width - margin, footerTop, {
+    drawText(context, `Pagina ${pageIndex + 1} de ${totalPages}`, pageSize.width - margin, footerTop, {
       align: 'right',
       color: '#64748b',
       font: '8px Arial',
@@ -396,8 +658,8 @@ function renderPdfReportPages({
 
     pages.push({
       dataUrl: canvas.toDataURL('image/jpeg', 0.92),
-      height: A4_PAGE.height,
-      width: A4_PAGE.width,
+      height: pageSize.height,
+      width: pageSize.width,
     })
   }
 

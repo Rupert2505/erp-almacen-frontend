@@ -4,7 +4,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { PermissionRoute } from '../../app/router/PermissionRoute'
 import { ProtectedRoute } from '../../app/router/ProtectedRoute'
-import { routeAccess } from '../../app/router/routeAccess'
+import {
+  canAccessRoute,
+  firstAuthorizedPath,
+  routeAccess,
+} from '../../app/router/routeAccess'
 import { Header } from '../../layout/Header'
 import { Sidebar } from '../../layout/Sidebar'
 import { AUTH_ACCESS_TOKEN_KEY, AUTH_USER_KEY } from '../../shared/utils/storageKeys'
@@ -39,6 +43,34 @@ const consultaUser = {
     'PROVEEDOR_VER',
     'REPORTE_VER',
     'STOCK_VER',
+  ],
+}
+
+const jefeAlmacenUser = {
+  username: 'jefe.almacen',
+  nombres: 'Jefe',
+  apellidos: 'Almacen',
+  email: 'jefe.almacen@example.com',
+  roles: ['JEFE_ALMACEN'],
+  permisos: [
+    'PERSONAL_VER',
+    'PERSONAL_CREAR',
+    'PERSONAL_EDITAR',
+    'PERSONAL_DESACTIVAR',
+  ],
+}
+
+const jefeAlmacenGestionUser = {
+  username: 'jefe.gestion',
+  nombres: 'Jefe',
+  apellidos: 'Gestion',
+  email: 'jefe.gestion@example.com',
+  roles: ['JEFE_ALMACEN'],
+  permisos: [
+    'ALMACEN_VER',
+    'ALMACEN_CREAR',
+    'ALMACEN_EDITAR',
+    'ALMACEN_DESACTIVAR',
   ],
 }
 
@@ -176,6 +208,55 @@ describe('auth, rutas protegidas y layout', () => {
     expect(screen.queryByText('Acceso no autorizado')).not.toBeInTheDocument()
   })
 
+  it('PermissionRoute permite Personal al JEFE_ALMACEN con permisos PERSONAL_*', () => {
+    renderWithAuth(
+      { isAuthenticated: true, status: 'authenticated', user: jefeAlmacenUser },
+      ['/personal'],
+      <Routes>
+        <Route
+          path="/personal"
+          element={
+            <PermissionRoute access={routeAccess.personal}>
+              <div>Gestion de personal habilitada</div>
+            </PermissionRoute>
+          }
+        />
+        <Route path="/403" element={<div>Acceso no autorizado</div>} />
+      </Routes>,
+    )
+
+    expect(screen.getByText('Gestion de personal habilitada')).toBeInTheDocument()
+    expect(screen.queryByText('Acceso no autorizado')).not.toBeInTheDocument()
+  })
+
+  it('elige Personal como inicio para JEFE_ALMACEN sin permisos de otros modulos', () => {
+    expect(firstAuthorizedPath(jefeAlmacenUser)).toBe('/personal')
+  })
+
+  it('permite las rutas de almacenes y ubicaciones al JEFE_ALMACEN con ALMACEN_VER', () => {
+    expect(canAccessRoute(jefeAlmacenGestionUser, routeAccess.almacenes)).toBe(true)
+    expect(canAccessRoute(jefeAlmacenGestionUser, routeAccess.ubicaciones)).toBe(true)
+
+    renderWithAuth(
+      { isAuthenticated: true, status: 'authenticated', user: jefeAlmacenGestionUser },
+      ['/almacenes'],
+      <Routes>
+        <Route
+          path="/almacenes"
+          element={
+            <PermissionRoute access={routeAccess.almacenes}>
+              <div>Gestion de almacenes habilitada</div>
+            </PermissionRoute>
+          }
+        />
+        <Route path="/403" element={<div>Acceso no autorizado</div>} />
+      </Routes>,
+    )
+
+    expect(screen.getByText('Gestion de almacenes habilitada')).toBeInTheDocument()
+    expect(screen.queryByText('Acceso no autorizado')).not.toBeInTheDocument()
+  })
+
   it('Header muestra usuario y ejecuta logout', async () => {
     const logout = vi.fn()
     const user = userEvent.setup()
@@ -213,6 +294,39 @@ describe('auth, rutas protegidas y layout', () => {
 
     await user.click(screen.getByRole('button', { name: 'Contraer menu' }))
     expect(onToggleCollapsed).toHaveBeenCalled()
+  })
+
+  it('Sidebar muestra Personal pero no Usuarios al JEFE_ALMACEN', () => {
+    renderWithAuth(
+      { isAuthenticated: true, status: 'authenticated', user: jefeAlmacenUser },
+      ['/personal'],
+      <Sidebar
+        isCollapsed={false}
+        isOpen
+        onClose={vi.fn()}
+        onToggleCollapsed={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: 'Personal' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Usuarios' })).not.toBeInTheDocument()
+  })
+
+  it('Sidebar muestra Almacenes y Ubicaciones pero no Usuarios al JEFE_ALMACEN', () => {
+    renderWithAuth(
+      { isAuthenticated: true, status: 'authenticated', user: jefeAlmacenGestionUser },
+      ['/almacenes'],
+      <Sidebar
+        isCollapsed={false}
+        isOpen
+        onClose={vi.fn()}
+        onToggleCollapsed={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: 'Almacenes' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ubicaciones' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Usuarios' })).not.toBeInTheDocument()
   })
 
   it('persistAuthSession guarda token y usuario; clearAuthSession limpia ambos', () => {

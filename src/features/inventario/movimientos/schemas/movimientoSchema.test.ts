@@ -5,6 +5,7 @@ const salidaVenta = {
   tipoMovimiento: 'SALIDA_VENTA',
   almacenOrigenId: 1,
   ordenTrabajo: 'OS-001',
+  personalRetiraId: 40,
   confirmar: true,
   detalles: [
     {
@@ -88,16 +89,42 @@ describe('movimientoSchema para SALIDA_VENTA', () => {
     }
   })
 
-  it('no exige datos comerciales para una salida no comercial', () => {
+  it('no exige OS ni datos comerciales para una salida consumo', () => {
     expect(
       movimientoSchema.safeParse({
         tipoMovimiento: 'SALIDA_CONSUMO',
         almacenOrigenId: 1,
         motivoMovimiento: 'Consumo interno',
-        observacion: 'Uso operativo',
+        personalRetiraId: 40,
         confirmar: true,
         detalles: [{ productoId: 10, cantidad: 1, costoUnitario: 8 }],
       }).success,
     ).toBe(true)
+
+    expect(
+      movimientoSchema.safeParse({
+        tipoMovimiento: 'SALIDA_CONSUMO',
+        almacenOrigenId: 1,
+        motivoMovimiento: 'Consumo interno',
+        personalRetiraId: 40,
+        ordenTrabajo: 'OS-CONS-001',
+        confirmar: true,
+        detalles: [{ productoId: 10, cantidad: 1, costoUnitario: 8 }],
+      }).success,
+    ).toBe(true)
+  })
+
+  it('requiere personal que retira o solicita en salidas', () => {
+    const salidaConsumo = movimientoSchema.safeParse({
+      tipoMovimiento: 'SALIDA_CONSUMO',
+      almacenOrigenId: 1,
+      motivoMovimiento: 'Consumo interno',
+      detalles: [{ productoId: 10, cantidad: 1, costoUnitario: 8 }],
+    })
+
+    expect(salidaConsumo.success).toBe(false)
+    expect(salidaConsumo.error?.issues.map((issue) => issue.message)).toContain(
+      'Seleccione el personal que retira o solicita',
+    )
   })
 })

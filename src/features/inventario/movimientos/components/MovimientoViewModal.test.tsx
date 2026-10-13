@@ -1,9 +1,19 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { Movimiento } from '../types/movimiento.types'
-import { MovimientoViewModal } from './MovimientoViewModal'
+import { MovimientoViewModal, usesSalidaPdfTemplate } from './MovimientoViewModal'
 
 describe('MovimientoViewModal', () => {
+  it('usa la plantilla PDF del backend para movimientos de salida', () => {
+    expect(usesSalidaPdfTemplate('SALIDA_CONSUMO')).toBe(true)
+    expect(usesSalidaPdfTemplate('SALIDA_VENTA')).toBe(true)
+    expect(usesSalidaPdfTemplate('SALIDA_AJUSTE')).toBe(true)
+    expect(usesSalidaPdfTemplate('AJUSTE_NEGATIVO')).toBe(true)
+    expect(usesSalidaPdfTemplate('DEVOLUCION_PROVEEDOR')).toBe(true)
+    expect(usesSalidaPdfTemplate('ENTRADA_COMPRA')).toBe(false)
+    expect(usesSalidaPdfTemplate('TRANSFERENCIA')).toBe(false)
+  })
+
   it('muestra datos de cancelacion para movimiento CANCELADO', () => {
     const movimiento: Movimiento = {
       id: 1,
@@ -38,6 +48,7 @@ describe('MovimientoViewModal', () => {
       numero: 'MOV-002',
       tipoMovimiento: 'SALIDA_CONSUMO',
       estado: 'ANULADO',
+      ordenTrabajo: 'OS-CONS-001',
       motivoAnulacion: 'Cantidad ingresada por error',
       anuladoPor: 'admin',
       anuladoEn: '2026-08-22T11:30:00',
@@ -55,6 +66,8 @@ describe('MovimientoViewModal', () => {
 
     expect(screen.getByText('Motivo anulacion')).toBeInTheDocument()
     expect(screen.getByText('Cantidad ingresada por error')).toBeInTheDocument()
+    expect(screen.getByText('Orden de Servicio (OS)')).toBeInTheDocument()
+    expect(screen.getByText('OS-CONS-001')).toBeInTheDocument()
     expect(screen.getByText('Anulado por')).toBeInTheDocument()
     expect(screen.getByText('admin')).toBeInTheDocument()
     expect(screen.getAllByText('Anulado en')).toHaveLength(2)
